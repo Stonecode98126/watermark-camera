@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stonecode 專屬浮水印相機</title>
+    <style>
+        /* 基礎全域設定：現代化深色/淺色融合質感 */
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            display: flex; flex-direction: column; align-items: center; 
+            padding: 20px; background: #e9ecef; margin: 0; min-height: 100vh;
+        }
+
+        /* 右上角創作人標籤 */
+        .creator-badge {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            z-index: 100;
+        }
+
+        /* 漂亮的外框設計 (適用於視訊預覽與照片) */
+        .photo-frame {
+            width: 100%; 
+            max-width: 500px; 
+            background: #fff;
+            padding: 10px 10px 20px 10px; /* 拍立得風格底部留白 */
+            border-radius: 8px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+            box-sizing: border-box;
+            margin-bottom: 20px;
+        }
+        video { 
+            width: 100%; 
+            border-radius: 4px; 
+            background: #000; 
+            display: block;
+        }
+
+        /* 控制面板與按鈕設計 */
+        .controls { width: 100%; max-width: 500px; }
+        button { 
+            width: 100%; padding: 16px; margin: 8px 0; font-size: 16px; font-weight: bold;
+            cursor: pointer; border: none; border-radius: 8px; transition: transform 0.1s;
+        }
+        button:active { transform: scale(0.98); }
+        .btn-snap { background: #007aff; color: white; box-shadow: 0 4px 10px rgba(0, 122, 255, 0.3); }
+        .btn-save { background: #ff9500; color: white; box-shadow: 0 4px 10px rgba(255, 149, 0, 0.3); text-decoration: none; display: block; text-align: center; box-sizing: border-box;}
+        .btn-upload { background: #34c759; color: white; box-shadow: 0 4px 10px rgba(52, 199, 89, 0.3); }
+        
+        input { width: 100%; padding: 14px; margin: 8px 0; border: 1px solid #ced4da; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
+        
+        #preview { display: none; margin-top: 10px; }
+        #photo { width: 100%; border-radius: 4px; display: block; }
+        .status { color: #495057; font-size: 14px; margin: 10px 0; font-weight: 500; text-align: center; }
+    </style>
+</head>
+<body>
+
+    <div class="creator-badge">Created by Stonecode</div>
+
+    <h2 style="color: #343a40; margin-bottom: 5px;">浮水印打卡系統</h2>
+    <div id="status" class="status">正在初始化相機與定位...</div>
+
+    <div class="photo-frame">
+        <video id="video" autoplay playsinline></video>
+    </div>
+    
+    <canvas id="canvas" style="display:none;"></canvas>
+
+    <div class="controls">
+        <button id="snap" class="btn-snap">📸 拍照並合成浮水印</button>
+        
+        <div id="preview">
+            <h3 style="color: #343a40;">照片預覽：</h3>
+            <div class="photo-frame">
+                <img id="photo">
+            </div>
+            
+            <a id="downloadBtn" class="btn-save" download="Stonecode_Watermark.jpg">💾 儲存照片到手機相簿</a>
+            
+            <p style="color: #495057; margin-top: 20px; font-size: 14px;">或上傳至伺服器：</p>
+            <input type="url" id="uploadUrl" placeholder="https://your-server.com/api/upload">
+            <button id="upload" class="btn-upload">🚀 傳送照片</button>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const photo = document.getElementById('photo');
+        const snapBtn = document.getElementById('snap');
+        const uploadBtn = document.getElementById('upload');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const previewDiv = document.getElementById('preview');
+        const statusDiv = document.getElementById('status');
+        
+        let currentLocation = "等待定位...";
+        let isVideoReady = false;
+
+        // 1. 取得 GPS 定位 (加上錯誤處理優化)
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    currentLocation = `緯度: ${pos.coords.latitude.toFixed(4)}, 經度: ${pos.coords.longitude.toFixed(4)}`;
+                    updateStatus();
+                },
+                (err) => {
+                    currentLocation = "未授權或無法取得定位";
+                    updateStatus();
+                },
+                { enableHighAccuracy: true, timeout: 5000 }
+            );
+        } else {
+            currentLocation = "裝置不支援定位";
+        }
+
+        // 2. 開啟手機鏡頭 (確保畫面載入後才允許拍照)
+        navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }, 
+            audio: false 
+        })
+        .then(stream => {
+            video.srcObject = stream;
+            video.onloadedmetadata = () => {
+                isVideoReady = true;
+                updateStatus();
+            };
+        })
+        .catch(err => {
+            statusDiv.innerText = "⚠️ 無法開啟鏡頭，請確認權限設定。";
+            statusDiv.style.color = "red";
+        });
+
+        function updateStatus() {
+            if(isVideoReady) {
+                statusDiv.innerText = `✅ 鏡頭就緒 | 📍 ${currentLocation}`;
+            }
+        }
+
+        // 3. 拍照並加上浮水印與外框
+        snapBtn.addEventListener('click', () => {
+            if (!isVideoReady) {
+                alert("相機尚未準備好，請稍後。");
+                return;
+            }
+
+            const context = canvas.getContext('2d');
+            
+            // 讀取真實的影像解析度
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            // 繪製原始相機畫面
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // --- 繪製照片本身的實體白框 (讓下載的圖也有框) ---
+            const borderWidth = canvas.width * 0.02; // 邊框厚度依比例縮放
+            context.lineWidth = borderWidth;
+            context.strokeStyle = "#ffffff";
+            context.strokeRect(borderWidth/2, borderWidth/2, canvas.width - borderWidth, canvas.height - borderWidth);
+
+            // --- 準備浮水印文字 ---
+            const now = new Date();
+            // 使用嚴謹的日期格式 YYYY/MM/DD HH:MM:SS
+            const timeStr = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+            const textLine1 = timeStr;
+            const textLine2 = currentLocation;
+            
+            // 動態計算字體大小 (基準為影像寬度的 3.5%)
+            const fontSize = Math.max(Math.floor(canvas.width * 0.035), 16); 
+            context.font = `bold ${fontSize}px sans-serif`;
+            
+            // 計算文字背景框的高度 (兩行文字)
+            const bgHeight = (fontSize * 2.5) + 20;
+            const bgY = canvas.height - bgHeight - borderWidth;
+
+            // 繪製半透明漸層背景 (提升質感)
+            const gradient = context.createLinearGradient(0, bgY, 0, canvas.height);
+            gradient.addColorStop(0, "transparent");
+            gradient.addColorStop(0.3, "rgba(0, 0, 0, 0.6)");
+            gradient.addColorStop(1, "rgba(0, 0, 0, 0.8)");
+            context.fillStyle = gradient;
+            context.fillRect(borderWidth, bgY, canvas.width - (borderWidth * 2), bgHeight);
+            
+            // 繪製文字 (加上陰影增加清晰度)
+            context.fillStyle = "white";
+            context.shadowColor = "black";
+            context.shadowBlur = 4;
+            context.shadowOffsetX = 2;
+            context.shadowOffsetY = 2;
+            
+            const textX = borderWidth + 20;
+            context.fillText(textLine1, textX, bgY + fontSize + 10);
+            context.fillText(textLine2, textX, bgY + (fontSize * 2) + 15);
+            
+            // 重置陰影設定以免影響後續繪製
+            context.shadowColor = "transparent";
+
+            // 4. 輸出預覽圖與設定下載連結
+            const imageData = canvas.toDataURL('image/jpeg', 0.9); // 0.9 壓縮比，平衡畫質與檔案大小
+            photo.src = imageData;
+            downloadBtn.href = imageData; // 將 Base64 塞入 a 標籤供直接下載
+            
+            previewDiv.style.display = 'block';
+            
+            // 平滑滾動到預覽區
+            setTimeout(() => {
+                previewDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+        });
+
+        // 5. 傳送照片 (保持原有 API 邏輯)
+        uploadBtn.addEventListener('click', () => {
+            const targetUrl = document.getElementById('uploadUrl').value;
+            if (!targetUrl) {
+                alert("請先輸入您的後端 API 網址！");
+                return;
+            }
+
+            const imageData = canvas.toDataURL('image/jpeg', 0.9);
+            const originalText = uploadBtn.innerText;
+            uploadBtn.innerText = "⏳ 傳送中...";
+            uploadBtn.disabled = true;
+            
+            fetch(targetUrl, {
+                method: 'POST',
+                body: JSON.stringify({ image: imageData, creator: "Stonecode" }),
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(res => {
+                if(res.ok) alert("✅ 照片上傳成功！");
+                else throw new Error("伺服器回應錯誤");
+            })
+            .catch(err => alert("❌ 傳送失敗，請檢查網址或跨域(CORS)設定: " + err.message))
+            .finally(() => {
+                uploadBtn.innerText = originalText;
+                uploadBtn.disabled = false;
+            });
+        });
+    </script>
+</body>
+</html>
