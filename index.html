@@ -14,7 +14,39 @@
         .btn-group { display: flex; gap: 10px; margin-bottom: 10px; }
         button, .btn-link { width: 100%; padding: 18px; border: none; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer; text-decoration: none; display: block; text-align: center; box-sizing: border-box; transition: 0.1s; color: white; }
         button:active { transform: scale(0.98); }
-        
+
+        /* 備註輸入欄 */
+        .remark-group {
+            margin-bottom: 12px;
+        }
+        .remark-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #444;
+            margin-bottom: 6px;
+            display: block;
+        }
+        #remark-input {
+            width: 100%;
+            padding: 14px 16px;
+            font-size: 16px;
+            border: 2px solid #dde2e8;
+            border-radius: 10px;
+            box-sizing: border-box;
+            background: #fff;
+            color: #222;
+            outline: none;
+            transition: border-color 0.2s;
+            -webkit-appearance: none;
+        }
+        #remark-input:focus {
+            border-color: #4a90e2;
+            box-shadow: 0 0 0 3px rgba(74,144,226,0.15);
+        }
+        #remark-input::placeholder {
+            color: #aab0bb;
+        }
+
         /* 按鈕顏色區分 */
         #snap-start { background: #28a745; box-shadow: 0 4px 10px rgba(40,167,69,0.3); }
         #snap-end { background: #dc3545; box-shadow: 0 4px 10px rgba(220,53,69,0.3); }
@@ -45,6 +77,18 @@
     </div>
 
     <div class="controls">
+
+        <!-- 備註輸入欄 -->
+        <div class="remark-group">
+            <label class="remark-label" for="remark-input">📝 工作備註（選填，將顯示於照片浮水印）</label>
+            <input
+                type="text"
+                id="remark-input"
+                placeholder="例：北棟3樓消防管路維修"
+                maxlength="60"
+            >
+        </div>
+
         <div class="btn-group">
             <button id="snap-start">🚀 開始工作</button>
             <button id="snap-end">🏁 結束工作</button>
@@ -70,6 +114,7 @@
         const statusDiv = document.getElementById('status');
         const fileInfoDiv = document.getElementById('file-info');
         const guide = document.getElementById('browser-guide');
+        const remarkInput = document.getElementById('remark-input');
 
         let currentAddress = "定位搜尋中...";
         let latLon = "";
@@ -131,31 +176,49 @@
             const timeStr = now.toLocaleTimeString('zh-TW', { hour12: false });
 
             const base = canvas.width * 0.03;
-            
-            // 繪製半透明黑色底盒
-            const gradHeight = base * 8;
+
+            // 取得備註文字
+            const remarkText = remarkInput.value.trim();
+
+            // 計算底盒高度：有備註時多一行
+            const extraRemarkHeight = remarkText ? base * 1.8 : 0;
+            const gradHeight = base * 8 + extraRemarkHeight;
             const gradY = canvas.height - gradHeight;
+
+            // 繪製半透明黑色底盒
             ctx.fillStyle = "rgba(0,0,0,0.6)";
             ctx.fillRect(0, gradY, canvas.width, gradHeight);
+
+            // 若有備註，繪製備註列（最頂部，黃色醒目）
+            if (remarkText) {
+                ctx.font = `bold ${base * 1.3}px sans-serif`;
+                ctx.fillStyle = "#FFD700";
+                // 截斷過長備註
+                const maxRemarkLen = 38;
+                const displayRemark = remarkText.length > maxRemarkLen ? remarkText.substring(0, maxRemarkLen) + "…" : remarkText;
+                ctx.fillText(`📝 ${displayRemark}`, 25, gradY + base * 1.5);
+            }
+
+            const contentOffsetY = remarkText ? base * 1.8 : 0;
 
             // 繪製【開始/結束】狀態標籤
             ctx.font = `bold ${base * 1.6}px sans-serif`;
             ctx.fillStyle = (type === "開始") ? "#28a745" : "#dc3545";
-            ctx.fillText(`【${type}工作】`, 25, gradY + (base * 2.5));
+            ctx.fillText(`【${type}工作】`, 25, gradY + contentOffsetY + (base * 2.5));
 
             // 繪製日期時間
             ctx.fillStyle = "white";
             ctx.font = `bold ${base * 2.5}px sans-serif`;
-            ctx.fillText(`${dateStr} ${timeStr}`, 25, gradY + (base * 5.3));
+            ctx.fillText(`${dateStr} ${timeStr}`, 25, gradY + contentOffsetY + (base * 5.3));
 
             // 繪製地址與座標
             ctx.font = `${base * 1.1}px sans-serif`;
             const addrToDisplay = currentAddress.length > 40 ? currentAddress.substring(0, 40) + "..." : currentAddress;
-            ctx.fillText(`📍 ${addrToDisplay}`, 27, gradY + (base * 6.7));
-            
+            ctx.fillText(`📍 ${addrToDisplay}`, 27, gradY + contentOffsetY + (base * 6.7));
+
             ctx.fillStyle = "rgba(255,255,255,0.7)";
             ctx.font = `${base * 0.9}px monospace`;
-            ctx.fillText(latLon, 27, gradY + (base * 7.7));
+            ctx.fillText(latLon, 27, gradY + contentOffsetY + (base * 7.7));
 
             // 品質壓縮 0.6
             const imgUrl = canvas.toDataURL('image/jpeg', 0.6);
