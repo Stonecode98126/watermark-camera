@@ -2,163 +2,77 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stonecode 地理浮水印相機</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Stonecode 相機</title>
     <style>
-        :root {
-            --primary: #6366f1;
-            --bg: #f8fafc;
-            --text: #1e293b;
-            --accent: #f59e0b;
-        }
+        body { margin: 0; padding: 5px; height: 100vh; display: flex; flex-direction: column; background: #000; color: white; font-family: sans-serif; overflow: hidden; }
+        
+        /* 画面占屏幕一半 */
+        .photo-frame { flex: 1; min-height: 0; overflow: hidden; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+        video, #photo { width: 100%; height: 100%; object-fit: cover; }
 
-        body { 
-            font-family: 'Inter', -apple-system, sans-serif; 
-            background: var(--bg); 
-            color: var(--text);
-            display: flex; flex-direction: column; align-items: center; 
-            padding: 20px; margin: 0; min-height: 100vh;
-        }
+        /* 控制面板占屏幕另一半 */
+        .controls { height: 45vh; display: flex; flex-direction: column; padding: 5px; box-sizing: border-box; }
+        .remark-group { margin-bottom: 5px; }
+        #remark-input { width: 100%; padding: 8px; border-radius: 8px; border: none; font-size: 14px; box-sizing: border-box; }
+        
+        .btn-group { display: flex; gap: 5px; }
+        button { flex: 1; padding: 12px; border: none; border-radius: 8px; font-weight: bold; font-size: 14px; color: white; }
+        #snap-start { background: #22c55e; }
+        #snap-end { background: #ef4444; }
+        .btn-save { display: block; text-align: center; background: #6366f1; padding: 12px; border-radius: 8px; color: white; text-decoration: none; margin-top: 5px; font-weight: bold; }
 
-        .creator-badge { 
-            position: absolute; top: 15px; right: 15px; 
-            background: #000; color: #fff; padding: 5px 12px; 
-            border-radius: 20px; font-size: 10px; z-index: 100; 
-        }
-
-        .photo-frame { 
-            width: 100%; max-width: 500px; 
-            background: #000; padding: 0; border-radius: 16px; 
-            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); 
-            margin-bottom: 24px; overflow: hidden;
-        }
-
-        video, #photo { width: 100%; display: block; }
-
-        .controls { width: 100%; max-width: 500px; }
-
-        .remark-group { margin-bottom: 24px; }
-        .remark-label { 
-            font-size: 12px; font-weight: 600; color: #64748b; 
-            margin-bottom: 8px; display: block; text-transform: uppercase;
-        }
-        #remark-input {
-            width: 100%; padding: 16px;
-            font-size: 16px; border: none; border-bottom: 2px solid #e2e8f0;
-            background: transparent; outline: none; transition: 0.3s;
-        }
-        #remark-input:focus { border-bottom-color: var(--primary); }
-
-        .btn-group { display: flex; gap: 12px; margin-bottom: 20px; }
-        button { 
-            flex: 1; padding: 18px; border: none; border-radius: 50px; 
-            font-size: 16px; font-weight: 700; cursor: pointer; 
-            color: white; transition: 0.2s; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-        }
-        button:active { transform: scale(0.97); }
-
-        #snap-start { background: linear-gradient(135deg, #22c55e, #16a34a); }
-        #snap-end { background: linear-gradient(135deg, #ef4444, #dc2626); }
-        .btn-save { 
-            width: 100%; display: block; padding: 18px; border-radius: 50px;
-            text-align: center; text-decoration: none; color: white;
-            background: var(--primary); font-weight: 700; margin-top: 15px;
-        }
-
-        #browser-guide { 
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(0,0,0,0.95); color: white; z-index: 999; 
-            flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 30px; 
-        }
-        .status { font-size: 13px; color: #64748b; margin-bottom: 20px; }
+        #preview { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 10; display: none; }
     </style>
 </head>
 <body>
 
-    <div class="creator-badge">STONECODE UTILITY</div>
-
-    <div id="browser-guide">
-        <div style="font-size: 40px; margin-bottom: 20px;">↗️</div>
-        <h2>請於瀏覽器中開啟</h2>
-        <p>偵測到內建瀏覽器，GPS 功能受限。</p>
-        <p>請點擊右上角「...」選擇「在瀏覽器中開啟」。</p>
-    </div>
-
-    <h2 style="margin-top: 40px; margin-bottom: 5px;">工作定位相機</h2>
-    <div id="status" class="status">正在檢查環境與定位...</div>
-
-    <div class="photo-frame">
-        <video id="video" autoplay playsinline></video>
-    </div>
+    <div class="photo-frame"><video id="video" autoplay playsinline></video></div>
 
     <div class="controls">
-        <div class="remark-group">
-            <label class="remark-label" for="remark-input">工作備註</label>
-            <input type="text" id="remark-input" placeholder="例：北棟3樓消防管路維修" maxlength="60">
-        </div>
-
+        <input type="text" id="remark-input" placeholder="工作備註...">
         <div class="btn-group">
             <button id="snap-start">🚀 開始</button>
             <button id="snap-end">🏁 結束</button>
         </div>
-
-        <div id="preview" style="display:none;">
-<div class="photo-frame">
-                <img id="photo">
-            </div>
-            <a id="downloadBtn" class="btn-save">💾 儲存照片</a>
+        <div id="preview">
+            <img id="photo" style="height: 70vh;">
+            <a id="downloadBtn" class="btn-save">💾 儲存</a>
+            <button onclick="location.reload()" style="background:#444; margin-top:5px;">🔙 重拍</button>
         </div>
     </div>
 
     <canvas id="canvas" style="display:none;"></canvas>
 
     <script>
-        const video = document.getElementById('video'), canvas = document.getElementById('canvas'), photo = document.getElementById('photo'), downloadBtn = document.getElementById('downloadBtn'), statusDiv = document.getElementById('status'), remarkInput = document.getElementById('remark-input');
+        const video = document.getElementById('video'), canvas = document.getElementById('canvas'), photo = document.getElementById('photo'), downloadBtn = document.getElementById('downloadBtn'), remarkInput = document.getElementById('remark-input');
         let currentAddress = "定位中...", latLon = "";
 
-        // 1. 定位
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(async (pos) => {
-                const lat = pos.coords.latitude, lon = pos.coords.longitude;
-                latLon = `GPS: ${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-                try {
-                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=zh-TW`);
-                    const data = await res.json();
-                    currentAddress = data.display_name.split(',').reverse().join(' ').trim();
-                    statusDiv.innerText = `📍 ${currentAddress}`;
-                } catch (e) { statusDiv.innerText = `📍 ${latLon}`; }
-            }, () => statusDiv.innerText = "❌ 無法取得定位", { enableHighAccuracy: true });
-        }
+        // 定位
+        navigator.geolocation.getCurrentPosition(pos => {
+            latLon = `GPS: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
+        }, null, { enableHighAccuracy: true });
 
-        // 2. 相機
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(stream => video.srcObject = stream).catch(() => statusDiv.innerText = "❌ 相機無法使用");
+        // 相机
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(s => video.srcObject = s);
 
-        // 3. 核心處理
+        // 拍照
         function processPhoto(type) {
-            const ctx = canvas.getContext('2d');
             canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
             ctx.drawImage(video, 0, 0);
-
-            const now = new Date(), dateStr = now.toLocaleDateString().replace(/\//g, '-'), timeStr = now.toLocaleTimeString('zh-TW', { hour12: false });
-            const base = canvas.width * 0.03;
-            ctx.fillStyle = "rgba(0,0,0,0.5)";
-            ctx.fillRect(0, canvas.height - base * 10, canvas.width, base * 10);
-
-            ctx.fillStyle = "#FFD700"; ctx.font = `bold ${base * 1.5}px Inter`;
-            ctx.fillText(remarkInput.value || "無備註", 30, canvas.height - base * 7.5);
             
-            ctx.fillStyle = (type === "開始") ? "#22c55e" : "#ef4444";
-            ctx.fillText(`【${type}工作】 ${dateStr} ${timeStr}`, 30, canvas.height - base * 5.0);
+            // 水印
+            ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(0, canvas.height - 200, canvas.width, 200);
+            ctx.fillStyle = "#FFD700"; ctx.font = "bold 40px Arial";
+            ctx.fillText(remarkInput.value || "無備註", 40, canvas.height - 150);
+            ctx.fillStyle = "white"; ctx.font = "30px Arial";
+            ctx.fillText(`${type}工作 | ${new Date().toLocaleString()}`, 40, canvas.height - 100);
+            ctx.fillText(latLon, 40, canvas.height - 50);
 
-            ctx.fillStyle = "white"; ctx.font = `${base * 1.2}px Inter`;
-            ctx.fillText(`📍 ${currentAddress.substring(0, 40)}`, 30, canvas.height - base * 2.5);
-            ctx.fillText(latLon, 30, canvas.height - base * 1.0);
-
-            const imgUrl = canvas.toDataURL('image/jpeg', 0.8);
-            photo.src = imgUrl; downloadBtn.href = imgUrl; downloadBtn.download = `Job_${type}_${dateStr}.jpg`;
-            document.getElementById('preview').style.display = 'block';
-            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+            photo.src = canvas.toDataURL('image/jpeg', 0.7);
+            downloadBtn.href = photo.src; downloadBtn.download = `Job_${type}.jpg`;
+document.getElementById('preview').style.display = 'block';
         }
 
         document.getElementById('snap-start').onclick = () => processPhoto("開始");
