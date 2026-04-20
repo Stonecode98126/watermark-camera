@@ -93,3 +93,93 @@
             <button id="snap-start">🚀 開始工作</button>
             <button id="snap-end">🏁 結束工作</button>
         </div>
+<div id="preview" style="display:none; margin-top: 15px;">
+            <h3 style="text-align:center; color:#333;">照片預覽：</h3>
+            <div class="photo-frame">
+                <img id="photo">
+                <div id="file-info"></div>
+            </div>
+            <a id="downloadBtn" class="btn-save">💾 儲存輕量化照片</a>
+        </div>
+    </div>
+
+    <canvas id="canvas" style="display:none;"></canvas>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const photo = document.getElementById('photo');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const statusDiv = document.getElementById('status');
+        const fileInfoDiv = document.getElementById('file-info');
+        const guide = document.getElementById('browser-guide');
+        const remarkInput = document.getElementById('remark-input');
+
+        let currentAddress = "定位搜尋中...";
+        let latLon = "";
+
+        // 1. 環境檢測
+        const ua = navigator.userAgent  navigator.vendor  window.opera;
+        const isAppBrowser = (ua.indexOf("Line") > -1)  (ua.indexOf("FBAN") > -1)  (ua.indexOf("FBAV") > -1) || (ua.indexOf("Instagram") > -1);
+        if (isAppBrowser) { guide.style.display = 'flex'; }
+
+        // 2. GPS 定位
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                const lat = pos.coords.latitude;
+                const lon = pos.coords.longitude;
+                latLon = GPS: ${lat.toFixed(5)}, ${lon.toFixed(5)};
+                try {
+                    const res = await fetch(https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=zh-TW);
+                    const data = await res.json();
+                    currentAddress = data.display_name.split(',').reverse().join(' ').trim();
+                    statusDiv.innerText = 📍 目前位置：${currentAddress};
+                } catch (e) {
+                    currentAddress = "地址解析暫時不可用";
+                    statusDiv.innerText = "📍 定位成功 " + latLon;
+                }
+            }, () => {
+                statusDiv.innerText = "❌ 請開啟並允許 GPS 定位權限";
+            }, { enableHighAccuracy: true });
+        }
+
+        // 3. 啟動相機
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+            .then(stream => { video.srcObject = stream; })
+            .catch(() => { statusDiv.innerText = "❌ 無法取得相機，請使用 Chrome 瀏覽器"; });
+
+        function getBase64Size(base64String) {
+            const stringLength = base64String.length - 'data:image/jpeg;base64,'.length;
+            const sizeInBytes = 4 * Math.ceil(stringLength / 3) * 0.5624896334383812;
+            return (sizeInBytes / 1024).toFixed(0) + " KB";
+        }
+
+        // 4. 核心拍照與繪製邏輯
+        function processPhoto(type) {
+            const ctx = canvas.getContext('2d');
+            const MAX_WIDTH = 1280;
+            let targetWidth = video.videoWidth;
+            let targetHeight = video.videoHeight;
+
+            if (targetWidth > MAX_WIDTH) {
+                targetHeight = Math.round(targetHeight * (MAX_WIDTH / targetWidth));
+                targetWidth = MAX_WIDTH;
+            }
+
+            canvas.width = targetWidth;
+            canvas.height = targetHeight;
+            ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
+
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('zh-TW', { year:'numeric', month:'2-digit', day:'2-digit' }).replace(/\//g, '-');
+            const timeStr = now.toLocaleTimeString('zh-TW', { hour12: false });
+
+            const base = canvas.width * 0.03;
+
+            // 取得備註文字
+            const remarkText = remarkInput.value.trim();
+
+            // 計算底盒高度：有備註時多一行
+            const extraRemarkHeight = remarkText ? base * 1.8 : 0;
+            const gradHeight = base * 8 + extraRemarkHeight;
+            const gradY = canvas.height - gradHeight;
