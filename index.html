@@ -1,238 +1,62 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stonecode 地理浮水印相機 - 工作紀錄版</title>
-    <style>
-        body { font-family: -apple-system, system-ui, sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; min-height: 100vh; padding-bottom: 50px;}
-        .creator-badge { position: absolute; top: 15px; right: 15px; background: #000; color: #fff; padding: 5px 12px; border-radius: 20px; font-size: 12px; z-index: 100; }
-        .photo-frame { width: 100%; max-width: 500px; background: #fff; padding: 10px 10px 25px 10px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 20px; box-sizing: border-box; }
-        video, #photo { width: 100%; border-radius: 8px; display: block; background: #000; }
-
-        .controls { width: 100%; max-width: 500px; }
-        .btn-group { display: flex; gap: 10px; margin-bottom: 10px; }
-        button, .btn-link { width: 100%; padding: 18px; border: none; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer; text-decoration: none; display: block; text-align: center; box-sizing: border-box; transition: 0.1s; color: white; }
-        button:active { transform: scale(0.98); }
-
-        /* 備註輸入欄 */
-        .remark-group {
-            margin-bottom: 12px;
-        }
-        .remark-label {
-            font-size: 13px;
-            font-weight: 600;
-            color: #444;
-            margin-bottom: 6px;
-            display: block;
-        }
-        #remark-input {
-            width: 100%;
-            padding: 14px 16px;
-            font-size: 16px;
-            border: 2px solid #dde2e8;
-            border-radius: 10px;
-            box-sizing: border-box;
-            background: #fff;
-            color: #222;
-            outline: none;
-            transition: border-color 0.2s;
-            -webkit-appearance: none;
-        }
-        #remark-input:focus {
-            border-color: #4a90e2;
-            box-shadow: 0 0 0 3px rgba(74,144,226,0.15);
-        }
-        #remark-input::placeholder {
-            color: #aab0bb;
-        }
-
-        /* 按鈕顏色區分 */
-        #snap-start { background: #28a745; box-shadow: 0 4px 10px rgba(40,167,69,0.3); }
-        #snap-end { background: #dc3545; box-shadow: 0 4px 10px rgba(220,53,69,0.3); }
-        .btn-save { background: #ff9500; color: white; box-shadow: 0 4px 10px rgba(255,149,0,0.3); margin-top: 15px; }
-
-        #browser-guide { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: white; z-index: 999; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 30px; }
-        .guide-arrow { position: absolute; top: 10px; right: 20px; font-size: 40px; }
-        .status { font-size: 14px; color: #555; margin: 10px 0; text-align: center; line-height: 1.5; }
-        #file-info { font-size: 12px; color: #888; margin-top: 5px; text-align: center; }
-    </style>
-</head>
-<body>
-
-    <div class="creator-badge">Created by Stonecode</div>
-
-    <div id="browser-guide">
-        <div class="guide-arrow">↗️</div>
-        <h2>請使用 Chrome 開啟</h2>
-        <p>偵測到內建瀏覽器，這會導致 GPS 無法運作。</p>
-        <p>請點擊右上角 <b>「...」</b><br>選擇 <b>「在瀏覽器中開啟」</b></p>
-    </div>
-
-    <h2 style="margin-top: 40px; margin-bottom: 5px;">工作定位相機</h2>
-    <div id="status" class="status">正在檢查環境與定位...</div>
-
-    <div class="photo-frame">
-        <video id="video" autoplay playsinline></video>
-    </div>
-
-    <div class="controls">
-
-        <!-- 備註輸入欄 -->
-        <div class="remark-group">
-            <label class="remark-label" for="remark-input">📝 工作備註（選填，將顯示於照片浮水印）</label>
-            <input
-                type="text"
-                id="remark-input"
-                placeholder="例：北棟3樓消防管路維修"
-                maxlength="60"
-            >
-        </div>
-
-        <div class="btn-group">
-            <button id="snap-start">🚀 開始工作</button>
-            <button id="snap-end">🏁 結束工作</button>
-        </div>
-
-        <div id="preview" style="display:none; margin-top: 15px;">
-            <h3 style="text-align:center; color:#333;">照片預覽：</h3>
-            <div class="photo-frame">
+<div class="photo-frame">
                 <img id="photo">
-                <div id="file-info"></div>
             </div>
-            <a id="downloadBtn" class="btn-save">💾 儲存輕量化照片</a>
+            <a id="downloadBtn" class="btn-save">💾 儲存照片</a>
         </div>
     </div>
 
     <canvas id="canvas" style="display:none;"></canvas>
 
     <script>
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const photo = document.getElementById('photo');
-        const downloadBtn = document.getElementById('downloadBtn');
-        const statusDiv = document.getElementById('status');
-        const fileInfoDiv = document.getElementById('file-info');
-        const guide = document.getElementById('browser-guide');
-        const remarkInput = document.getElementById('remark-input');
+        const video = document.getElementById('video'), canvas = document.getElementById('canvas'), photo = document.getElementById('photo'), downloadBtn = document.getElementById('downloadBtn'), statusDiv = document.getElementById('status'), remarkInput = document.getElementById('remark-input');
+        let currentAddress = "定位中...", latLon = "";
 
-        let currentAddress = "定位搜尋中...";
-        let latLon = "";
-
-        // 1. 環境檢測
-        const ua = navigator.userAgent || navigator.vendor || window.opera;
-        const isAppBrowser = (ua.indexOf("Line") > -1) || (ua.indexOf("FBAN") > -1) || (ua.indexOf("FBAV") > -1) || (ua.indexOf("Instagram") > -1);
-        if (isAppBrowser) { guide.style.display = 'flex'; }
-
-        // 2. GPS 定位
+        // 1. 定位
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(async (pos) => {
-                const lat = pos.coords.latitude;
-                const lon = pos.coords.longitude;
+                const lat = pos.coords.latitude, lon = pos.coords.longitude;
                 latLon = `GPS: ${lat.toFixed(5)}, ${lon.toFixed(5)}`;
                 try {
                     const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=zh-TW`);
                     const data = await res.json();
                     currentAddress = data.display_name.split(',').reverse().join(' ').trim();
-                    statusDiv.innerText = `📍 目前位置：${currentAddress}`;
-                } catch (e) {
-                    currentAddress = "地址解析暫時不可用";
-                    statusDiv.innerText = "📍 定位成功 " + latLon;
-                }
-            }, () => {
-                statusDiv.innerText = "❌ 請開啟並允許 GPS 定位權限";
-            }, { enableHighAccuracy: true });
+                    statusDiv.innerText = `📍 ${currentAddress}`;
+                } catch (e) { statusDiv.innerText = `📍 ${latLon}`; }
+            }, () => statusDiv.innerText = "❌ 無法取得定位", { enableHighAccuracy: true });
         }
 
-        // 3. 啟動相機
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-            .then(stream => { video.srcObject = stream; })
-            .catch(() => { statusDiv.innerText = "❌ 無法取得相機，請使用 Chrome 瀏覽器"; });
+        // 2. 相機
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(stream => video.srcObject = stream).catch(() => statusDiv.innerText = "❌ 相機無法使用");
 
-        function getBase64Size(base64String) {
-            const stringLength = base64String.length - 'data:image/jpeg;base64,'.length;
-            const sizeInBytes = 4 * Math.ceil(stringLength / 3) * 0.5624896334383812;
-            return (sizeInBytes / 1024).toFixed(0) + " KB";
-        }
-
-        // 4. 核心拍照與繪製邏輯
+        // 3. 核心處理
         function processPhoto(type) {
             const ctx = canvas.getContext('2d');
-            const MAX_WIDTH = 1280;
-            let targetWidth = video.videoWidth;
-            let targetHeight = video.videoHeight;
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
 
-            if (targetWidth > MAX_WIDTH) {
-                targetHeight = Math.round(targetHeight * (MAX_WIDTH / targetWidth));
-                targetWidth = MAX_WIDTH;
-            }
-
-            canvas.width = targetWidth;
-            canvas.height = targetHeight;
-            ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
-
-            const now = new Date();
-            const dateStr = now.toLocaleDateString('zh-TW', { year:'numeric', month:'2-digit', day:'2-digit' }).replace(/\//g, '-');
-            const timeStr = now.toLocaleTimeString('zh-TW', { hour12: false });
-
+            const now = new Date(), dateStr = now.toLocaleDateString().replace(/\//g, '-'), timeStr = now.toLocaleTimeString('zh-TW', { hour12: false });
             const base = canvas.width * 0.03;
+            ctx.fillStyle = "rgba(0,0,0,0.5)";
+            ctx.fillRect(0, canvas.height - base * 10, canvas.width, base * 10);
 
-            // 取得備註文字
-            const remarkText = remarkInput.value.trim();
+            ctx.fillStyle = "#FFD700"; ctx.font = `bold ${base * 1.5}px Inter`;
+            ctx.fillText(remarkInput.value || "無備註", 30, canvas.height - base * 7.5);
+            
+            ctx.fillStyle = (type === "開始") ? "#22c55e" : "#ef4444";
+            ctx.fillText(`【${type}工作】 ${dateStr} ${timeStr}`, 30, canvas.height - base * 5.0);
 
-            // 計算底盒高度：有備註時多一行
-            const extraRemarkHeight = remarkText ? base * 1.8 : 0;
-            const gradHeight = base * 8 + extraRemarkHeight;
-            const gradY = canvas.height - gradHeight;
+            ctx.fillStyle = "white"; ctx.font = `${base * 1.2}px Inter`;
+            ctx.fillText(`📍 ${currentAddress.substring(0, 40)}`, 30, canvas.height - base * 2.5);
+            ctx.fillText(latLon, 30, canvas.height - base * 1.0);
 
-            // 繪製半透明黑色底盒
-            ctx.fillStyle = "rgba(0,0,0,0.6)";
-            ctx.fillRect(0, gradY, canvas.width, gradHeight);
-
-            // 若有備註，繪製備註列（最頂部，黃色醒目）
-            if (remarkText) {
-                ctx.font = `bold ${base * 1.3}px sans-serif`;
-                ctx.fillStyle = "#FFD700";
-                // 截斷過長備註
-                const maxRemarkLen = 38;
-                const displayRemark = remarkText.length > maxRemarkLen ? remarkText.substring(0, maxRemarkLen) + "…" : remarkText;
-                ctx.fillText(`📝 ${displayRemark}`, 25, gradY + base * 1.5);
-            }
-
-            const contentOffsetY = remarkText ? base * 1.8 : 0;
-
-            // 繪製【開始/結束】狀態標籤
-            ctx.font = `bold ${base * 1.6}px sans-serif`;
-            ctx.fillStyle = (type === "開始") ? "#28a745" : "#dc3545";
-            ctx.fillText(`【${type}工作】`, 25, gradY + contentOffsetY + (base * 2.5));
-
-            // 繪製日期時間
-            ctx.fillStyle = "white";
-            ctx.font = `bold ${base * 2.5}px sans-serif`;
-            ctx.fillText(`${dateStr} ${timeStr}`, 25, gradY + contentOffsetY + (base * 5.3));
-
-            // 繪製地址與座標
-            ctx.font = `${base * 1.1}px sans-serif`;
-            const addrToDisplay = currentAddress.length > 40 ? currentAddress.substring(0, 40) + "..." : currentAddress;
-            ctx.fillText(`📍 ${addrToDisplay}`, 27, gradY + contentOffsetY + (base * 6.7));
-
-            ctx.fillStyle = "rgba(255,255,255,0.7)";
-            ctx.font = `${base * 0.9}px monospace`;
-            ctx.fillText(latLon, 27, gradY + contentOffsetY + (base * 7.7));
-
-            // 品質壓縮 0.6
-            const imgUrl = canvas.toDataURL('image/jpeg', 0.6);
-            photo.src = imgUrl;
-            downloadBtn.href = imgUrl;
-            downloadBtn.download = `Job_${type}_${dateStr}_${timeStr.replace(/:/g,'')}.jpg`;
-
-            fileInfoDiv.innerText = `[ ${type}紀錄已生成 | 解析度: ${targetWidth}x${targetHeight} | 預估大小: ${getBase64Size(imgUrl)} ]`;
+            const imgUrl = canvas.toDataURL('image/jpeg', 0.8);
+            photo.src = imgUrl; downloadBtn.href = imgUrl; downloadBtn.download = `Job_${type}_${dateStr}.jpg`;
             document.getElementById('preview').style.display = 'block';
             window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
         }
 
-        document.getElementById('snap-start').addEventListener('click', () => processPhoto("開始"));
-        document.getElementById('snap-end').addEventListener('click', () => processPhoto("結束"));
+        document.getElementById('snap-start').onclick = () => processPhoto("開始");
+        document.getElementById('snap-end').onclick = () => processPhoto("結束");
     </script>
 </body>
 </html>
