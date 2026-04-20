@@ -2,81 +2,94 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Stonecode 相機</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stonecode 地理浮水印相機 - 工作紀錄版</title>
     <style>
-        body { margin: 0; padding: 5px; height: 100vh; display: flex; flex-direction: column; background: #000; color: white; font-family: sans-serif; overflow: hidden; }
-        
-        /* 画面占屏幕一半 */
-        .photo-frame { flex: 1; min-height: 0; overflow: hidden; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
-        video, #photo { width: 100%; height: 100%; object-fit: cover; }
+        body { font-family: -apple-system, system-ui, sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; min-height: 100vh; padding-bottom: 50px;}
+        .creator-badge { position: absolute; top: 15px; right: 15px; background: #000; color: #fff; padding: 5px 12px; border-radius: 20px; font-size: 12px; z-index: 100; }
+        .photo-frame { width: 100%; max-width: 500px; background: #fff; padding: 10px 10px 25px 10px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 20px; box-sizing: border-box; }
+        video, #photo { width: 100%; border-radius: 8px; display: block; background: #000; }
 
-        /* 控制面板占屏幕另一半 */
-        .controls { height: 45vh; display: flex; flex-direction: column; padding: 5px; box-sizing: border-box; }
-        .remark-group { margin-bottom: 5px; }
-        #remark-input { width: 100%; padding: 8px; border-radius: 8px; border: none; font-size: 14px; box-sizing: border-box; }
-        
-        .btn-group { display: flex; gap: 5px; }
-        button { flex: 1; padding: 12px; border: none; border-radius: 8px; font-weight: bold; font-size: 14px; color: white; }
-        #snap-start { background: #22c55e; }
-        #snap-end { background: #ef4444; }
-        .btn-save { display: block; text-align: center; background: #6366f1; padding: 12px; border-radius: 8px; color: white; text-decoration: none; margin-top: 5px; font-weight: bold; }
+        .controls { width: 100%; max-width: 500px; }
+        .btn-group { display: flex; gap: 10px; margin-bottom: 10px; }
+        button, .btn-link { width: 100%; padding: 18px; border: none; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer; text-decoration: none; display: block; text-align: center; box-sizing: border-box; transition: 0.1s; color: white; }
+        button:active { transform: scale(0.98); }
 
-        #preview { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 10; display: none; }
+        /* 備註輸入欄 */
+        .remark-group {
+            margin-bottom: 12px;
+        }
+        .remark-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #444;
+            margin-bottom: 6px;
+            display: block;
+        }
+        #remark-input {
+            width: 100%;
+            padding: 14px 16px;
+            font-size: 16px;
+            border: 2px solid #dde2e8;
+            border-radius: 10px;
+            box-sizing: border-box;
+            background: #fff;
+            color: #222;
+            outline: none;
+            transition: border-color 0.2s;
+            -webkit-appearance: none;
+        }
+        #remark-input:focus {
+            border-color: #4a90e2;
+            box-shadow: 0 0 0 3px rgba(74,144,226,0.15);
+        }
+        #remark-input::placeholder {
+            color: #aab0bb;
+        }
+
+        /* 按鈕顏色區分 */
+        #snap-start { background: #28a745; box-shadow: 0 4px 10px rgba(40,167,69,0.3); }
+        #snap-end { background: #dc3545; box-shadow: 0 4px 10px rgba(220,53,69,0.3); }
+        .btn-save { background: #ff9500; color: white; box-shadow: 0 4px 10px rgba(255,149,0,0.3); margin-top: 15px; }
+
+        #browser-guide { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: white; z-index: 999; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 30px; }
+        .guide-arrow { position: absolute; top: 10px; right: 20px; font-size: 40px; }
+        .status { font-size: 14px; color: #555; margin: 10px 0; text-align: center; line-height: 1.5; }
+        #file-info { font-size: 12px; color: #888; margin-top: 5px; text-align: center; }
     </style>
 </head>
 <body>
 
-    <div class="photo-frame"><video id="video" autoplay playsinline></video></div>
+    <div class="creator-badge">Created by Stonecode</div>
 
-    <div class="controls">
-        <input type="text" id="remark-input" placeholder="工作備註...">
-        <div class="btn-group">
-            <button id="snap-start">🚀 開始</button>
-            <button id="snap-end">🏁 結束</button>
-        </div>
-        <div id="preview">
-            <img id="photo" style="height: 70vh;">
-            <a id="downloadBtn" class="btn-save">💾 儲存</a>
-            <button onclick="location.reload()" style="background:#444; margin-top:5px;">🔙 重拍</button>
-        </div>
+    <div id="browser-guide">
+        <div class="guide-arrow">↗️</div>
+        <h2>請使用 Chrome 開啟</h2>
+        <p>偵測到內建瀏覽器，這會導致 GPS 無法運作。</p>
+        <p>請點擊右上角 <b>「...」</b><br>選擇 <b>「在瀏覽器中開啟」</b></p>
     </div>
 
-    <canvas id="canvas" style="display:none;"></canvas>
+    <h2 style="margin-top: 40px; margin-bottom: 5px;">工作定位相機</h2>
+    <div id="status" class="status">正在檢查環境與定位...</div>
 
-    <script>
-        const video = document.getElementById('video'), canvas = document.getElementById('canvas'), photo = document.getElementById('photo'), downloadBtn = document.getElementById('downloadBtn'), remarkInput = document.getElementById('remark-input');
-        let currentAddress = "定位中...", latLon = "";
+    <div class="photo-frame">
+        <video id="video" autoplay playsinline></video>
+    </div>
 
-        // 定位
-        navigator.geolocation.getCurrentPosition(pos => {
-            latLon = `GPS: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
-        }, null, { enableHighAccuracy: true });
+    <div class="controls">
 
-        // 相机
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(s => video.srcObject = s);
+        <!-- 備註輸入欄 -->
+        <div class="remark-group">
+            <label class="remark-label" for="remark-input">📝 工作備註（選填，將顯示於照片浮水印）</label>
+            <input
+                type="text"
+                id="remark-input"
+                placeholder="例：北棟3樓消防管路維修"
+                maxlength="60"
+            >
+        </div>
 
-        // 拍照
-        function processPhoto(type) {
-            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0);
-            
-            // 水印
-            ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(0, canvas.height - 200, canvas.width, 200);
-            ctx.fillStyle = "#FFD700"; ctx.font = "bold 40px Arial";
-            ctx.fillText(remarkInput.value || "無備註", 40, canvas.height - 150);
-            ctx.fillStyle = "white"; ctx.font = "30px Arial";
-            ctx.fillText(`${type}工作 | ${new Date().toLocaleString()}`, 40, canvas.height - 100);
-            ctx.fillText(latLon, 40, canvas.height - 50);
-
-            photo.src = canvas.toDataURL('image/jpeg', 0.7);
-            downloadBtn.href = photo.src; downloadBtn.download = `Job_${type}.jpg`;
-document.getElementById('preview').style.display = 'block';
-        }
-
-        document.getElementById('snap-start').onclick = () => processPhoto("開始");
-        document.getElementById('snap-end').onclick = () => processPhoto("結束");
-    </script>
-</body>
-</html>
+        <div class="btn-group">
+            <button id="snap-start">🚀 開始工作</button>
+            <button id="snap-end">🏁 結束工作</button>
+        </div>
