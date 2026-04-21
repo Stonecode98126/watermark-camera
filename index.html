@@ -402,11 +402,11 @@
                 currentLon = pos.coords.longitude;
                 latLon = `GPS: ${currentLat.toFixed(5)}, ${currentLon.toFixed(5)}`;
  
-                // 地址解析
+                // 地址解析(使用 addressdetails 結構化欄位,精確過濾不要的層級)
                 try {
-                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${currentLat}&lon=${currentLon}&accept-language=zh-TW`);
+                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&addressdetails=1&lat=${currentLat}&lon=${currentLon}&accept-language=zh-TW`);
                     const data = await res.json();
-                    currentAddress = data.display_name.split(',').reverse().join(' ').trim();
+                    currentAddress = formatTWAddress(data);
                     statusDiv.innerText = `📍 ${currentAddress}`;
                 } catch (e) {
                     currentAddress = "地址解析暫時不可用";
@@ -444,6 +444,49 @@
             if (code <= 86) return { emoji: "🌨️", text: "陣雪" };
             if (code <= 99) return { emoji: "⛈️", text: "雷雨" };
             return { emoji: "☁️", text: "未知" };
+        }
+ 
+        // ==================== 台灣地址格式化 ====================
+        // 組合順序:郵遞區號 縣市 區 路名巷弄號
+        // 過濾:國家(臺灣)、里、鄰、區塊、村、neighbourhood
+        function formatTWAddress(data) {
+            if (!data) return "未知地點";
+            const a = data.address || {};
+ 
+            // 郵遞區號
+            const postcode = a.postcode || "";
+ 
+            // 縣市(Nominatim 會把直轄市放在 city,其他縣放在 county)
+            const cityLevel = a.city || a.county || a.state || "";
+ 
+            // 區/鄉/鎮(排除「里」「村」之類的更細層)
+            const districtLevel = a.city_district || a.district || a.town || a.township || a.suburb || "";
+ 
+            // 路名
+            const road = a.road || "";
+ 
+            // 巷弄號(Nominatim 分別在 neighbourhood 可能含巷弄,但更可靠的是 house_number)
+            const houseNumber = a.house_number || "";
+ 
+            // 組合
+            const parts = [postcode, cityLevel, districtLevel, road + houseNumber].filter(p => p && p.trim());
+            let result = parts.join(" ").trim();
+ 
+            // fallback:如果結構化欄位取不到足夠資訊,改從 display_name 清理
+            if (!result || parts.length < 2) {
+                const raw = (data.display_name || "").split(",").map(s => s.trim());
+                // 移除含「臺灣/台灣」「里」「鄰」「區塊」的片段
+                const filtered = raw.filter(p =>
+                    p &&
+                    !/臺灣|台灣|Taiwan/i.test(p) &&
+                    !/里$/.test(p) &&
+                    !/鄰$/.test(p) &&
+                    !/村$/.test(p)
+                );
+                result = filtered.reverse().join(" ").trim();
+            }
+ 
+            return result || "未知地點";
         }
  
         // ==================== 相機 ====================
