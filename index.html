@@ -293,10 +293,10 @@
     <div id="weather-info">☁️ 天氣載入中...</div>
  
     <div class="type-switcher">
-        <button class="type-btn active" data-type="screening" data-color="#28a745" data-label="篩檢">🔬 篩檢</button>
-        <button class="type-btn" data-type="meeting" data-color="#007AFF" data-label="會議">💼 會議</button>
-        <button class="type-btn" data-type="admin" data-color="#8e44ad" data-label="行政">📋 行政</button>
-        <button class="type-btn" data-type="transit" data-color="#fd7e14" data-label="移動">🚗 移動</button>
+        <button class="type-btn active" data-type="screening" data-color="#28a745" data-label="吊掛">吊掛</button>
+        <button class="type-btn" data-type="meeting" data-color="#007AFF" data-label="安裝">安裝</button>
+        <button class="type-btn" data-type="admin" data-color="#8e44ad" data-label="固定籃">固定籃</button>
+        <button class="type-btn" data-type="transit" data-color="#fd7e14" data-label="移動">移動</button>
     </div>
  
     <div class="video-wrap">
@@ -364,10 +364,10 @@
         let lastPhotoBlob = null;  // 分享用
  
         const TYPE_EMOJI = {
-            screening: "🔬",
-            meeting: "💼",
-            admin: "📋",
-            transit: "🚗"
+            screening: "",
+            meeting: "",
+            admin: "",
+            transit: ""
         };
  
         // ==================== Toast ====================
@@ -623,9 +623,8 @@
             // 工作類型 + 開始/結束
             ctx.font = `bold ${base * 1.5}px sans-serif`;
             ctx.fillStyle = currentThemeColor;
-            const typeEmoji = TYPE_EMOJI[currentWorkType] || "📌";
             const statusLabel = (startOrEnd === "開始") ? "🚀" : "🏁";
-            ctx.fillText(`${typeEmoji} ${currentTypeLabel} ${statusLabel} ${startOrEnd}`, textLeft, cursorY);
+            ctx.fillText(`${currentTypeLabel} ${statusLabel} ${startOrEnd}`, textLeft, cursorY);
             cursorY += base * 2.2;
  
             // 日期時間
