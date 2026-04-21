@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工作統計</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: -apple-system, system-ui, sans-serif;
+            background: #f0f2f5;
+            color: #333;
+            padding: 12px;
+            padding-bottom: 60px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .title { font-size: 18px; font-weight: bold; }
+        .back-link {
+            background: #007AFF; color: white;
+            padding: 6px 12px; border-radius: 8px;
+            text-decoration: none; font-size: 13px; font-weight: bold;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .card-title {
+            font-size: 15px;
+            font-weight: bold;
+            margin-bottom: 12px;
+            color: #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .month-nav { display: flex; gap: 6px; }
+        .month-btn {
+            background: #e9ecef;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        /* 摘要卡片 */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+        .summary-item {
+            background: #f8f9fa;
+            padding: 10px 6px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .summary-num { font-size: 20px; font-weight: bold; color: #007AFF; }
+        .summary-label { font-size: 11px; color: #666; margin-top: 2px; }
+
+        /* 熱力圖 */
+        .heatmap {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+        }
+        .heatmap-cell {
+            aspect-ratio: 1;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #999;
+            background: #f0f0f0;
+        }
+        .heatmap-cell.has-work {
+            color: white;
+            font-weight: bold;
+        }
+        .heatmap-cell.level-1 { background: #c3e6cb; }
+        .heatmap-cell.level-2 { background: #6fbf7a; color: white; }
+        .heatmap-cell.level-3 { background: #28a745; color: white; }
+        .heatmap-cell.level-4 { background: #155724; color: white; }
+        .heatmap-cell.today { box-shadow: 0 0 0 2px #007AFF; }
+        .weekday-row {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+            margin-bottom: 4px;
+        }
+        .weekday {
+            text-align: center;
+            font-size: 11px;
+            color: #888;
+            font-weight: bold;
+        }
+
+        /* 圓餅圖 */
+        .pie-wrap {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .pie-svg { flex-shrink: 0; }
+        .pie-legend { flex: 1; font-size: 12px; }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+        .legend-dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+
+        /* 地點長條圖 */
+        .location-bar {
+            margin-bottom: 8px;
+        }
+        .location-name {
+            font-size: 12px;
+            margin-bottom: 2px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .bar-outer {
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .bar-inner {
+            height: 100%;
+            background: linear-gradient(90deg, #007AFF, #00c6ff);
+            border-radius: 4px;
+        }
+
+        /* 按鈕區 */
+        .btn-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .action-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+        }
+        .btn-export { background: #28a745; }
+        .btn-clear { background: #dc3545; }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+            font-size: 14px;
+        }
+
+        #toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.85);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 13px;
+            z-index: 2000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        #toast.show { opacity: 1; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="title">📊 工作統計</div>
+        <a href="index.html" class="back-link">← 返回相機</a>
+    </div>
+
+    <div id="content"></div>
+
+    <div id="toast"></div>
+
+    <script>
+        const TYPE_COLORS = {
+            screening: "#28a745",
+            meeting: "#007AFF",
+            admin: "#8e44ad",
+            transit: "#fd7e14"
+        };
+        const TYPE_LABELS = {
+            screening: "篩檢",
+            meeting: "會議",
+            admin: "行政",
+            transit: "移動"
+        };
+
+        let currentViewMonth = new Date();  // 統計頁目前顯示的月份
+        const toast = document.getElementById('toast');
+
+        function showToast(msg, duration = 2000) {
+            toast.innerText = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), duration);
+        }
+
+        // 讀取所有紀錄
+        function loadRecords() {
+            try {
+                return JSON.parse(localStorage.getItem('workcam_records') || '[]');
+            } catch (e) {
+                return [];
+            }
+        }
+
+        // 配對開始/結束以計算工時
+        // 回傳:[{start, end, durationMin, type, note, address, lat, lon, date}]
+        function pairSessions(records) {
+            const sorted = [...records].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+            const sessions = [];
+            const pendingStarts = [];  // 待配對的開始紀錄
+
+            for (const rec of sorted) {
+                if (rec.action === "開始") {
+                    pendingStarts.push(rec);
+                } else if (rec.action === "結束") {
+                    // 找最近同類型的開始
+                    let matchIdx = -1;
+                    for (let i = pendingStarts.length - 1; i >= 0; i--) {
+                        if (pendingStarts[i].type === rec.type) {
+                            matchIdx = i;
+                            break;
+                        }
+                    }
+                    if (matchIdx >= 0) {
+                        const start = pendingStarts[matchIdx];
+                        pendingStarts.splice(matchIdx, 1);
+                        const durationMs = new Date(rec.timestamp) - new Date(start.timestamp);
+                        const durationMin = Math.round(durationMs / 60000);
+                        sessions.push({
+                            start: start,
+                            end: rec,
+                            durationMin: durationMin,
+                            type: rec.type,
+                            note: start.note || rec.note,
+                            address: start.address,
+                            lat: start.lat,
+                            lon: start.lon,
+                            date: start.date
+                        });
+                    }
+                }
+            }
+            return { sessions, orphanStarts: pendingStarts };
+        }
+
+        // 過濾指定月份的紀錄
+        function filterByMonth(items, yearMonth, getDate) {
+            return items.filter(it => {
+                const d = getDate(it);
+                const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                return ym === yearMonth;
+            });
+        }
+
+        // ==================== 渲染 ====================
+        function render() {
+            const records = loadRecords();
+            const content = document.getElementById('content');
+
+            if (records.length === 0) {
+                content.innerHTML = `
+                    <div class="card">
+                        <div class="empty-state">
+                            📷 尚無工作紀錄<br>
+                            <small style="color:#bbb;">開始拍照後,紀錄會出現在這裡</small>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            const yearMonth = `${currentViewMonth.getFullYear()}-${String(currentViewMonth.getMonth() + 1).padStart(2, '0')}`;
+            const monthLabel = `${currentViewMonth.getFullYear()} 年 ${currentViewMonth.getMonth() + 1} 月`;
+
+            const { sessions } = pairSessions(records);
+            const monthRecords = filterByMonth(records, yearMonth, r => new Date(r.timestamp));
+            const monthSessions = filterByMonth(sessions, yearMonth, s => new Date(s.start.timestamp));
+
+            // 摘要
+            const totalMinutes = monthSessions.reduce((sum, s) => sum + s.durationMin, 0);
+            const totalHours = (totalMinutes / 60).toFixed(1);
+            const workDays = new Set(monthSessions.map(s => s.date)).size;
+            const totalPhotos = monthRecords.length;
+
+            let html = `
+                <div class="card">
+                    <div class="card-title">
+                        <span>📅 ${monthLabel} 摘要</span>
+                        <div class="month-nav">
+                            <button class="month-btn" onclick="changeMonth(-1)">◀</button>
+                            <button class="month-btn" onclick="changeMonth(1)">▶</button>
+                        </div>
+                    </div>
+                    <div class="summary-grid">
+                        <div class="summary-item">
+                            <div class="summary-num">${totalHours}</div>
+                            <div class="summary-label">總工時(小時)</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-num">${workDays}</div>
+                            <div class="summary-label">工作天數</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-num">${totalPhotos}</div>
+                            <div class="summary-label">紀錄張數</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 月曆熱力圖
+            html += renderHeatmap(monthSessions, monthRecords);
+
+            // 工作類型圓餅圖
+            html += renderPieChart(monthSessions);
+
+            // 地點分布長條圖
+            html += renderLocationBars(monthSessions);
+
+            // 詳細清單
+            html += renderSessionList(monthSessions);
+
+            // 按鈕
+            html += `
+                <div class="btn-row">
+                    <button class="action-btn btn-export" onclick="exportCSV()">📥 匯出 CSV</button>
+                    <button class="action-btn btn-clear" onclick="clearAll()">🗑️ 清除全部</button>
+                </div>
+                <div style="text-align:center; color:#aaa; font-size:11px; margin-top:12px;">
+                    共累計 ${records.length} 筆紀錄 | 永久保存直到手動清除
+                </div>
+            `;
+
+            content.innerHTML = html;
+        }
+
+        function renderHeatmap(monthSessions, monthRecords) {
+            const year = currentViewMonth.getFullYear();
+            const month = currentViewMonth.getMonth();
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const daysInMonth = lastDay.getDate();
+            const firstDayWeek = firstDay.getDay();  // 0=Sun
+            const today = new Date();
+            const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
+            // 每日工時
+            const dayMinutes = {};
+            monthSessions.forEach(s => {
+                dayMinutes[s.date] = (dayMinutes[s.date] || 0) + s.durationMin;
+            });
+            // 若只有拍照但沒配對成功(孤兒紀錄),用紀錄數代表
+            const dayCount = {};
+            monthRecords.forEach(r => {
+                dayCount[r.date] = (dayCount[r.date] || 0) + 1;
+            });
+
+            let cells = '';
+            const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+            let weekdayRow = '<div class="weekday-row">';
+            weekdays.forEach(w => weekdayRow += `<div class="weekday">${w}</div>`);
+            weekdayRow += '</div>';
+
+            // 前面的空格
+            for (let i = 0; i < firstDayWeek; i++) {
+                cells += '<div></div>';
+            }
+
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                const mins = dayMinutes[dateStr] || 0;
+                const count = dayCount[dateStr] || 0;
+
+                let levelClass = '';
+                if (mins > 0) {
+                    if (mins >= 480) levelClass = 'level-4';
+                    else if (mins >= 300) levelClass = 'level-3';
+                    else if (mins >= 120) levelClass = 'level-2';
+                    else levelClass = 'level-1';
+                } else if (count > 0) {
+                    levelClass = 'level-1';
+                }
+
+                const hasWork = (mins > 0 || count > 0) ? 'has-work' : '';
+                const isToday = (dateStr === todayStr) ? 'today' : '';
+                const tip = mins > 0 ? `${Math.floor(mins/60)}h${mins%60}m` : (count > 0 ? `${count}筆` : '');
+
+                cells += `<div class="heatmap-cell ${hasWork} ${levelClass} ${isToday}" title="${dateStr} ${tip}">${d}</div>`;
+            }
+
+            return `
+                <div class="card">
+                    <div class="card-title">🔥 月曆熱力圖</div>
+                    ${weekdayRow}
+                    <div class="heatmap">${cells}</div>
+                    <div style="font-size:10px;color:#888;margin-top:8px;">
+                        顏色越深代表工時越長 | <span style="display:inline-block;width:10px;height:10px;background:#007AFF;border-radius:50%;vertical-align:middle;"></span> 今日
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderPieChart(monthSessions) {
+            if (monthSessions.length === 0) {
+                return `<div class="card"><div class="card-title">🥧 工作類型分布</div><div style="text-align:center;color:#999;font-size:13px;padding:20px;">本月尚無完整工作紀錄</div></div>`;
+            }
+
+            const typeMinutes = {};
+            monthSessions.forEach(s => {
+                typeMinutes[s.type] = (typeMinutes[s.type] || 0) + s.durationMin;
+            });
+            const total = Object.values(typeMinutes).reduce((a, b) => a + b, 0);
+
+            // SVG 圓餅圖
+            const size = 120, cx = size/2, cy = size/2, r = size/2 - 4;
+            let angleStart = -Math.PI / 2;
+            let paths = '';
+            let legend = '';
+            const entries = Object.entries(typeMinutes).sort((a, b) => b[1] - a[1]);
+
+            entries.forEach(([type, mins]) => {
+                const pct = mins / total;
+                const angleEnd = angleStart + pct * Math.PI * 2;
+                const x1 = cx + r * Math.cos(angleStart);
+                const y1 = cy + r * Math.sin(angleStart);
+                const x2 = cx + r * Math.cos(angleEnd);
+                const y2 = cy + r * Math.sin(angleEnd);
+                const largeArc = pct > 0.5 ? 1 : 0;
+                const color = TYPE_COLORS[type] || '#888';
+
+                if (entries.length === 1) {
+                    // 只有一類,畫整圓
+                    paths += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}"/>`;
+                } else {
+                    paths += `<path d="M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z" fill="${color}"/>`;
+                }
+
+                const h = Math.floor(mins / 60);
+                const m = mins % 60;
+                legend += `
+                    <div class="legend-item">
+                        <span class="legend-dot" style="background:${color}"></span>
+                        <span>${TYPE_LABELS[type] || type}:${h}h${m}m (${(pct*100).toFixed(0)}%)</span>
+                    </div>
+                `;
+
+                angleStart = angleEnd;
+            });
+
+            return `
+                <div class="card">
+                    <div class="card-title">🥧 工作類型分布</div>
+                    <div class="pie-wrap">
+                        <svg class="pie-svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${paths}</svg>
+                        <div class="pie-legend">${legend}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderLocationBars(monthSessions) {
+            if (monthSessions.length === 0) {
+                return `<div class="card"><div class="card-title">📍 地點工時分布</div><div style="text-align:center;color:#999;font-size:13px;padding:20px;">本月尚無完整工作紀錄</div></div>`;
+            }
+
+            // 用簡化地址當 key(取逆序後最後幾段)
+            const locMinutes = {};
+            monthSessions.forEach(s => {
+                const addr = s.address || '未知地點';
+                const shortAddr = simplifyAddress(addr);
+                locMinutes[shortAddr] = (locMinutes[shortAddr] || 0) + s.durationMin;
+            });
+
+            const sorted = Object.entries(locMinutes).sort((a, b) => b[1] - a[1]).slice(0, 8);
+            const max = sorted[0] ? sorted[0][1] : 1;
+
+            let bars = '';
+            sorted.forEach(([loc, mins]) => {
+                const h = Math.floor(mins / 60);
+                const m = mins % 60;
+                const pct = (mins / max * 100).toFixed(1);
+                bars += `
+                    <div class="location-bar">
+                        <div class="location-name">
+                            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${loc}</span>
+                            <span style="color:#007AFF;font-weight:bold;margin-left:8px;">${h}h${m}m</span>
+                        </div>
+                        <div class="bar-outer"><div class="bar-inner" style="width:${pct}%"></div></div>
+                    </div>
+                `;
+            });
+
+            return `
+                <div class="card">
+                    <div class="card-title">📍 地點工時分布(前 8)</div>
+                    ${bars}
+                </div>
+            `;
+        }
+
+        function simplifyAddress(addr) {
+            // 取關鍵部分(市/區/路)
+            if (!addr || addr === '未知地點') return '未知地點';
+            // 移除郵遞區號與國名
+            const cleaned = addr.replace(/臺灣|台灣|\d{3,6}/g, '').trim();
+            // 取前 20 字
+            return cleaned.length > 20 ? cleaned.substring(0, 20) + '...' : cleaned;
+        }
+
+        function renderSessionList(monthSessions) {
+            if (monthSessions.length === 0) return '';
+            const sorted = [...monthSessions].sort((a, b) => new Date(b.start.timestamp) - new Date(a.start.timestamp));
+            let items = '';
+            sorted.slice(0, 10).forEach(s => {
+                const h = Math.floor(s.durationMin / 60);
+                const m = s.durationMin % 60;
+                const color = TYPE_COLORS[s.type] || '#888';
+                items += `
+                    <div style="padding:8px 0;border-bottom:1px solid #eee;font-size:12px;">
+                        <div style="display:flex;justify-content:space-between;">
+                            <span style="color:${color};font-weight:bold;">${TYPE_LABELS[s.type]}</span>
+                            <span style="color:#007AFF;font-weight:bold;">${h}h${m}m</span>
+                        </div>
+                        <div style="color:#666;margin-top:2px;">${s.date} ${s.start.time.substring(0,5)}–${s.end.time.substring(0,5)}</div>
+                        <div style="color:#999;font-size:11px;margin-top:2px;">${simplifyAddress(s.address)}</div>
+                        ${s.note ? `<div style="color:#d4a017;font-size:11px;margin-top:2px;">📝 ${s.note}</div>` : ''}
+                    </div>
+                `;
+            });
+            return `
+                <div class="card">
+                    <div class="card-title">📝 最近工作紀錄(最多 10 筆)</div>
+                    ${items}
+                </div>
+            `;
+        }
+
+        // ==================== 月份切換 ====================
+        function changeMonth(delta) {
+            currentViewMonth.setMonth(currentViewMonth.getMonth() + delta);
+            render();
+        }
+        window.changeMonth = changeMonth;
+
+        // ==================== CSV 匯出 ====================
+        function exportCSV() {
+            const records = loadRecords();
+            if (records.length === 0) { showToast("無紀錄可匯出"); return; }
+
+            const headers = ['日期', '時間', '類型', '動作', '備註', '地址', '緯度', '經度', '天氣', '變焦', '雜湊', '檔名'];
+            const rows = records.map(r => [
+                r.date, r.time, r.typeLabel || r.type, r.action,
+                r.note || '', r.address || '',
+                r.lat || '', r.lon || '',
+                r.weather || '', r.zoom || '',
+                r.hash || '', r.fileName || ''
+            ]);
+
+            // 加上工時配對結果
+            const { sessions } = pairSessions(records);
+            const sessionHeaders = ['--- 工時配對 ---', '', '', '', '', '', '', '', '', '', '', ''];
+            const sessionHeader2 = ['日期', '類型', '開始時間', '結束時間', '工時(分鐘)', '備註', '地址', '', '', '', '', ''];
+            const sessionRows = sessions.map(s => [
+                s.date, TYPE_LABELS[s.type] || s.type,
+                s.start.time, s.end.time, s.durationMin,
+                s.note || '', simplifyAddress(s.address),
+                '', '', '', '', ''
+            ]);
+
+            const allRows = [headers, ...rows, [], sessionHeaders, sessionHeader2, ...sessionRows];
+
+            const csv = allRows.map(row =>
+                row.map(cell => {
+                    const s = String(cell).replace(/"/g, '""');
+                    return s.includes(',') || s.includes('\n') || s.includes('"') ? `"${s}"` : s;
+                }).join(',')
+            ).join('\n');
+
+            const BOM = '\uFEFF';  // Excel 正確顯示中文
+            const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const today = new Date().toISOString().slice(0, 10);
+            a.href = url;
+            a.download = `工作紀錄_${today}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast("✅ CSV 已匯出");
+        }
+        window.exportCSV = exportCSV;
+
+        function clearAll() {
+            if (!confirm("確定要清除所有工作紀錄嗎?\n此動作無法復原。")) return;
+            if (!confirm("真的要刪除嗎?請先匯出 CSV 備份!")) return;
+            localStorage.removeItem('workcam_records');
+            showToast("已清除所有紀錄");
+            setTimeout(render, 500);
+        }
+        window.clearAll = clearAll;
+
+        // 首次渲染
+        render();
+    </script>
+</body>
+</html>
