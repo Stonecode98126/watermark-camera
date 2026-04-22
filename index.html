@@ -309,7 +309,7 @@
     </div>
  
     <div class="note-section">
-        <input type="text" id="note-input" placeholder="備註 (特殊狀況)..." maxlength="30">
+        <input type="text" id="note-input" placeholder="備註 (選填)..." maxlength="30">
     </div>
  
     <div class="btn-group">
@@ -359,7 +359,7 @@
         let hardwareZoomSupported = false;
         let currentZoom = 1.0;
         let currentWorkType = "screening";
-        let currentTypeLabel = "吊掛";
+        let currentTypeLabel = "篩檢";
         let currentThemeColor = "#28a745";
         let lastPhotoBlob = null;  // 分享用
  
@@ -599,7 +599,7 @@
             }
  
             const ctx = canvas.getContext('2d');
-            const MAX_WIDTH = 1280;
+            const MAX_WIDTH = 1920;
             const vw = video.videoWidth;
             const vh = video.videoHeight;
             let targetWidth = vw, targetHeight = vh;
@@ -703,7 +703,7 @@
             cursorY += base * 0.9;
  
             // 先輸出一次(不含雜湊)以計算雜湊
-            const preliminaryUrl = canvas.toDataURL('image/jpeg', 0.6);
+            const preliminaryUrl = canvas.toDataURL('image/jpeg', 0.85);
             const hash = await computeHash(preliminaryUrl);
  
             // 繪製雜湊
@@ -712,7 +712,7 @@
             ctx.fillText(`🔐 ${hash}`, textLeft, cursorY);
  
             // 最終輸出
-            const imgUrl = canvas.toDataURL('image/jpeg', 0.6);
+            const imgUrl = canvas.toDataURL('image/jpeg', 0.85);
             photo.src = imgUrl;
             downloadBtn.href = imgUrl;
  
