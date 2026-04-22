@@ -359,7 +359,7 @@
         let hardwareZoomSupported = false;
         let currentZoom = 1.0;
         let currentWorkType = "screening";
-        let currentTypeLabel = "篩檢";
+        let currentTypeLabel = "吊掛";
         let currentThemeColor = "#28a745";
         let lastPhotoBlob = null;  // 分享用
  
@@ -384,6 +384,15 @@
         if (isAppBrowser) { guide.style.display = 'flex'; }
  
         // ==================== 工作類型切換 ====================
+        // 啟動時從 HTML 上 active 的按鈕讀取預設值,避免 HTML/JS 不同步
+        const defaultBtn = document.querySelector('.type-btn.active');
+        if (defaultBtn) {
+            currentWorkType = defaultBtn.dataset.type;
+            currentTypeLabel = defaultBtn.dataset.label;
+            currentThemeColor = defaultBtn.dataset.color;
+            document.documentElement.style.setProperty('--theme-color', currentThemeColor);
+        }
+ 
         document.querySelectorAll('.type-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
