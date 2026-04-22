@@ -779,6 +779,15 @@
                 showToast("照片尚未就緒");
                 return;
             }
+ 
+            // 先自動觸發儲存(模擬點擊下載連結)
+            try {
+                downloadBtn.click();
+                showToast("💾 照片已儲存至 Download");
+            } catch (e) {
+                console.warn("自動儲存失敗:", e);
+            }
+ 
             const shareText = `【${currentTypeLabel} - ${document.querySelector('.type-btn.active').dataset.label}】\n📍 ${currentAddress}\n🕐 ${new Date().toLocaleString('zh-TW')}${noteInput.value.trim() ? '\n📝 ' + noteInput.value.trim() : ''}`;
  
             if (navigator.share && navigator.canShare && navigator.canShare({ files: [lastPhotoBlob] })) {
@@ -792,12 +801,12 @@
                     if (e.name !== 'AbortError') showToast("分享取消或失敗");
                 }
             } else {
-                // Fallback:複製文字 + 提示儲存照片
+                // Fallback:複製文字
                 try {
                     await navigator.clipboard.writeText(shareText);
-                    showToast("📋 文字已複製,請搭配儲存的照片");
+                    showToast("📋 已儲存並複製文字");
                 } catch (e) {
-                    showToast("此瀏覽器不支援直接分享,請使用「儲存」");
+                    showToast("已儲存,此瀏覽器不支援直接分享");
                 }
             }
         });
