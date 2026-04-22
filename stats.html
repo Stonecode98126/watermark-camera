@@ -174,6 +174,39 @@
             font-size: 14px;
         }
  
+        /* CSV 完整紀錄表格 */
+        .csv-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            white-space: nowrap;
+        }
+        .csv-table th {
+            background: #f8f9fa;
+            padding: 8px 10px;
+            text-align: left;
+            font-weight: bold;
+            color: #555;
+            border-bottom: 2px solid #ddd;
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+        .csv-table td {
+            padding: 6px 10px;
+            border-bottom: 1px solid #f0f0f0;
+            color: #333;
+        }
+        .csv-table tr:hover td {
+            background: #f8f9fa;
+        }
+        .csv-table tr:nth-child(even) td {
+            background: #fafafa;
+        }
+        .csv-table tr:nth-child(even):hover td {
+            background: #f0f0f0;
+        }
+ 
         #toast {
             position: fixed;
             bottom: 80px;
@@ -359,6 +392,12 @@
                     <button class="action-btn btn-export" onclick="exportCSV()">📥 匯出 CSV</button>
                     <button class="action-btn btn-clear" onclick="clearAll()">🗑️ 清除全部</button>
                 </div>
+            `;
+ 
+            // 完整 CSV 紀錄(全部資料,不限月份)
+            html += renderFullCsvTable(records);
+ 
+            html += `
                 <div style="text-align:center; color:#aaa; font-size:11px; margin-top:12px;">
                     共累計 ${records.length} 筆紀錄 | 永久保存直到手動清除
                 </div>
@@ -567,6 +606,95 @@
                 </div>
             `;
         }
+ 
+        // ==================== 完整 CSV 格式表格 ====================
+        function renderFullCsvTable(records) {
+            if (records.length === 0) return '';
+ 
+            const headers = ['日期', '時間', '類型', '動作', '備註', '地址', '緯度', '經度', '天氣', '變焦', '雜湊'];
+ 
+            // 按時間新到舊排序
+            const sorted = [...records].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+ 
+            let headerHtml = '<tr>';
+            headers.forEach(h => headerHtml += `<th>${h}</th>`);
+            headerHtml += '</tr>';
+ 
+            let rowsHtml = '';
+            sorted.forEach(r => {
+                const typeColor = TYPE_COLORS[r.type] || '#888';
+                const actionColor = r.action === "開始" ? "#28a745" : "#dc3545";
+                rowsHtml += `<tr>
+                    <td>${r.date || ''}</td>
+                    <td>${r.time || ''}</td>
+                    <td style="color:${typeColor};font-weight:bold;">${r.typeLabel || r.type || ''}</td>
+                    <td style="color:${actionColor};font-weight:bold;">${r.action || ''}</td>
+                    <td>${escapeHtml(r.note || '')}</td>
+                    <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(r.address || '')}">${escapeHtml(r.address || '')}</td>
+                    <td>${r.lat ? r.lat.toFixed(5) : ''}</td>
+                    <td>${r.lon ? r.lon.toFixed(5) : ''}</td>
+                    <td>${escapeHtml(r.weather || '')}</td>
+                    <td>${r.zoom ? r.zoom.toFixed(1) + 'x' : ''}</td>
+                    <td style="font-family:monospace;font-size:10px;">${r.hash || ''}</td>
+                </tr>`;
+            });
+ 
+            return `
+                <div class="card">
+                    <div class="card-title">
+                        <span>📋 完整紀錄表 (CSV 格式,全部 ${records.length} 筆)</span>
+                        <button class="month-btn" onclick="copyFullCsv()">📋 複製</button>
+                    </div>
+                    <div style="overflow-x:auto;max-height:400px;overflow-y:auto;border:1px solid #eee;border-radius:6px;">
+                        <table class="csv-table">
+                            <thead>${headerHtml}</thead>
+                            <tbody>${rowsHtml}</tbody>
+                        </table>
+                    </div>
+                    <div style="font-size:10px;color:#888;margin-top:8px;line-height:1.4;">
+                        ↔ 可橫向滾動 | ↕ 可上下滾動 | 按「📋 複製」可直接貼到試算表
+                    </div>
+                </div>
+            `;
+        }
+ 
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/[&<>"']/g, c => ({
+                '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+            }[c]));
+        }
+ 
+        // 複製完整資料為 TSV(可直接貼到 Excel/Google Sheets)
+        function copyFullCsv() {
+            const records = loadRecords();
+            if (records.length === 0) { showToast("無資料可複製"); return; }
+ 
+            const headers = ['日期', '時間', '類型', '動作', '備註', '地址', '緯度', '經度', '天氣', '變焦', '雜湊'];
+            const sorted = [...records].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            const rows = sorted.map(r => [
+                r.date || '', r.time || '',
+                r.typeLabel || r.type || '', r.action || '',
+                r.note || '', r.address || '',
+                r.lat || '', r.lon || '',
+                r.weather || '', r.zoom || '', r.hash || ''
+            ]);
+            // 用 TAB 分隔,貼到試算表會自動分欄
+            const tsv = [headers, ...rows].map(row =>
+                row.map(c => String(c).replace(/\t/g, ' ').replace(/\n/g, ' ')).join('\t')
+            ).join('\n');
+ 
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(tsv).then(() => {
+                    showToast(`✅ 已複製 ${records.length} 筆到剪貼簿`);
+                }).catch(() => {
+                    showToast("複製失敗,請改用匯出 CSV");
+                });
+            } else {
+                showToast("此瀏覽器不支援複製,請改用匯出 CSV");
+            }
+        }
+        window.copyFullCsv = copyFullCsv;
  
         // ==================== 月份切換 ====================
         function changeMonth(delta) {
