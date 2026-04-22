@@ -703,7 +703,7 @@
             cursorY += base * 0.9;
  
             // 先輸出一次(不含雜湊)以計算雜湊
-            const preliminaryUrl = canvas.toDataURL('image/jpeg', 0.85);
+            const preliminaryUrl = canvas.toDataURL('image/jpeg', 0.92);
             const hash = await computeHash(preliminaryUrl);
  
             // 繪製雜湊
@@ -712,7 +712,7 @@
             ctx.fillText(`🔐 ${hash}`, textLeft, cursorY);
  
             // 最終輸出
-            const imgUrl = canvas.toDataURL('image/jpeg', 0.85);
+            const imgUrl = canvas.toDataURL('image/jpeg', 0.92);
             photo.src = imgUrl;
             downloadBtn.href = imgUrl;
  
