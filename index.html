@@ -577,7 +577,7 @@
         async function drawMiniMap(ctx, x, y, size, lat, lon) {
             if (lat === null || lon === null) return;
             try {
-                const zoom = 16;  // 街區規模
+                const zoom = 13;  // 街區規模
                 const n = Math.pow(2, zoom);
  
                 // 計算精確的瓦片座標(浮點數,小數部分代表在瓦片內的相對位置)
