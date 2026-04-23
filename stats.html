@@ -206,6 +206,13 @@
         .csv-table tr:nth-child(even):hover td {
             background: #f0f0f0;
         }
+        /* 勾選框放大,手機好按 */
+        .csv-table input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #dc3545;
+        }
  
         #toast {
             position: fixed;
@@ -610,24 +617,32 @@
             `;
         }
  
-        // ==================== 完整 CSV 格式表格 ====================
+        // ==================== 完整 CSV 格式表格(含刪除功能) ====================
         function renderFullCsvTable(records) {
             if (records.length === 0) return '';
  
-            const headers = ['日期', '時間', '類型', '動作', '備註', '地址', '緯度', '經度', '天氣', '變焦', '雜湊'];
+            const headers = ['', '日期', '時間', '類型', '動作', '備註', '地址', '緯度', '經度', '天氣', '變焦', '雜湊'];
  
             // 按時間新到舊排序
             const sorted = [...records].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
  
             let headerHtml = '<tr>';
-            headers.forEach(h => headerHtml += `<th>${h}</th>`);
+            headers.forEach((h, i) => {
+                if (i === 0) {
+                    headerHtml += `<th style="width:36px;"><input type="checkbox" id="select-all-cb" onchange="toggleSelectAll(this)"></th>`;
+                } else {
+                    headerHtml += `<th>${h}</th>`;
+                }
+            });
             headerHtml += '</tr>';
  
             let rowsHtml = '';
             sorted.forEach(r => {
                 const typeColor = TYPE_COLORS[r.type] || '#888';
                 const actionColor = (r.action === "開始" || r.action === "出發") ? "#28a745" : "#dc3545";
-                rowsHtml += `<tr>
+                const ts = escapeHtml(r.timestamp || '');
+                rowsHtml += `<tr data-ts="${ts}">
+                    <td style="text-align:center;"><input type="checkbox" class="row-cb" data-ts="${ts}" onchange="updateDeleteBar()"></td>
                     <td>${r.date || ''}</td>
                     <td>${r.time || ''}</td>
                     <td style="color:${typeColor};font-weight:bold;">${r.typeLabel || r.type || ''}</td>
@@ -645,8 +660,15 @@
             return `
                 <div class="card">
                     <div class="card-title">
-                        <span>📋 完整紀錄表 (CSV 格式,全部 ${records.length} 筆)</span>
+                        <span>📋 完整紀錄表 (全部 ${records.length} 筆)</span>
                         <button class="month-btn" onclick="copyFullCsv()">📋 複製</button>
+                    </div>
+                    <div id="delete-bar" style="display:none;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:8px 12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+                        <span id="delete-bar-text" style="font-size:13px;color:#856404;font-weight:bold;">已選 0 筆</span>
+                        <div style="display:flex;gap:6px;">
+                            <button class="month-btn" style="background:#6c757d;color:white;" onclick="clearSelection()">取消</button>
+                            <button class="month-btn" style="background:#dc3545;color:white;" onclick="deleteSelected()">🗑️ 刪除選中</button>
+                        </div>
                     </div>
                     <div style="overflow-x:auto;max-height:400px;overflow-y:auto;border:1px solid #eee;border-radius:6px;">
                         <table class="csv-table">
@@ -655,11 +677,82 @@
                         </table>
                     </div>
                     <div style="font-size:10px;color:#888;margin-top:8px;line-height:1.4;">
-                        ↔ 可橫向滾動 | ↕ 可上下滾動 | 按「📋 複製」可直接貼到試算表
+                        ↔ 可橫向滾動 | ↕ 可上下滾動 | 勾選後可刪除單筆或多筆 | 按「📋 複製」可直接貼到試算表
                     </div>
                 </div>
             `;
         }
+ 
+        // ==================== 選取 & 刪除控制 ====================
+        function toggleSelectAll(cb) {
+            document.querySelectorAll('.row-cb').forEach(rowCb => {
+                rowCb.checked = cb.checked;
+            });
+            updateDeleteBar();
+        }
+        window.toggleSelectAll = toggleSelectAll;
+ 
+        function updateDeleteBar() {
+            const checked = document.querySelectorAll('.row-cb:checked');
+            const bar = document.getElementById('delete-bar');
+            const text = document.getElementById('delete-bar-text');
+            if (!bar || !text) return;
+            if (checked.length === 0) {
+                bar.style.display = 'none';
+            } else {
+                bar.style.display = 'flex';
+                text.innerText = `已選 ${checked.length} 筆`;
+            }
+ 
+            // 同步「全選」的狀態
+            const all = document.querySelectorAll('.row-cb');
+            const selectAllCb = document.getElementById('select-all-cb');
+            if (selectAllCb) {
+                if (checked.length === 0) {
+                    selectAllCb.checked = false;
+                    selectAllCb.indeterminate = false;
+                } else if (checked.length === all.length) {
+                    selectAllCb.checked = true;
+                    selectAllCb.indeterminate = false;
+                } else {
+                    selectAllCb.checked = false;
+                    selectAllCb.indeterminate = true;  // 部分選中的半透明狀態
+                }
+            }
+        }
+        window.updateDeleteBar = updateDeleteBar;
+ 
+        function clearSelection() {
+            document.querySelectorAll('.row-cb').forEach(cb => cb.checked = false);
+            const selectAllCb = document.getElementById('select-all-cb');
+            if (selectAllCb) { selectAllCb.checked = false; selectAllCb.indeterminate = false; }
+            updateDeleteBar();
+        }
+        window.clearSelection = clearSelection;
+ 
+        function deleteSelected() {
+            const checked = document.querySelectorAll('.row-cb:checked');
+            if (checked.length === 0) { showToast("未選取任何紀錄"); return; }
+            const count = checked.length;
+            if (!confirm(`確定要刪除選中的 ${count} 筆紀錄嗎?\n此動作無法復原。`)) return;
+ 
+            // 取得所有要刪除的 timestamp
+            const tsToDelete = new Set();
+            checked.forEach(cb => tsToDelete.add(cb.dataset.ts));
+ 
+            // 從 localStorage 過濾
+            const records = loadRecords();
+            const remaining = records.filter(r => !tsToDelete.has(r.timestamp));
+ 
+            try {
+                localStorage.setItem('workcam_records', JSON.stringify(remaining));
+                showToast(`✅ 已刪除 ${count} 筆紀錄`);
+                setTimeout(render, 400);
+            } catch (e) {
+                showToast("刪除失敗");
+            }
+        }
+        window.deleteSelected = deleteSelected;
  
         function escapeHtml(str) {
             if (!str) return '';
