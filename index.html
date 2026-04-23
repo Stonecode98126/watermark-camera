@@ -577,7 +577,7 @@
         async function drawMiniMap(ctx, x, y, size, lat, lon) {
             if (lat === null || lon === null) return;
             try {
-                const zoom = 13;  // 街區規模
+                const zoom = 18;  // 建築輪廓級,最清晰
                 const n = Math.pow(2, zoom);
  
                 // 計算精確的瓦片座標(浮點數,小數部分代表在瓦片內的相對位置)
@@ -703,7 +703,7 @@
             }
  
             const ctx = canvas.getContext('2d');
-            const MAX_WIDTH = 1920;
+            const MAX_WIDTH = 2560;
             const vw = video.videoWidth;
             const vh = video.videoHeight;
             let targetWidth = vw, targetHeight = vh;
@@ -807,7 +807,7 @@
             cursorY += base * 0.9;
  
             // 先輸出一次(不含雜湊)以計算雜湊
-            const preliminaryUrl = canvas.toDataURL('image/jpeg', 0.92);
+            const preliminaryUrl = canvas.toDataURL('image/jpeg', 0.95);
             const hash = await computeHash(preliminaryUrl);
  
             // 繪製雜湊
@@ -816,7 +816,7 @@
             ctx.fillText(`🔐 ${hash}`, textLeft, cursorY);
  
             // 最終輸出
-            const imgUrl = canvas.toDataURL('image/jpeg', 0.92);
+            const imgUrl = canvas.toDataURL('image/jpeg', 0.95);
             photo.src = imgUrl;
             downloadBtn.href = imgUrl;
  
