@@ -268,17 +268,20 @@
             }
         }
  
-        // 配對開始/結束以計算工時
+        // 配對開始/結束(或出發/抵達)以計算工時
         // 回傳:[{start, end, durationMin, type, note, address, lat, lon, date}]
         function pairSessions(records) {
             const sorted = [...records].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
             const sessions = [];
-            const pendingStarts = [];  // 待配對的開始紀錄
+            const pendingStarts = [];  // 待配對的開始/出發紀錄
+ 
+            const isStartAction = (a) => a === "開始" || a === "出發";
+            const isEndAction = (a) => a === "結束" || a === "抵達";
  
             for (const rec of sorted) {
-                if (rec.action === "開始") {
+                if (isStartAction(rec.action)) {
                     pendingStarts.push(rec);
-                } else if (rec.action === "結束") {
+                } else if (isEndAction(rec.action)) {
                     // 找最近同類型的開始
                     let matchIdx = -1;
                     for (let i = pendingStarts.length - 1; i >= 0; i--) {
@@ -623,7 +626,7 @@
             let rowsHtml = '';
             sorted.forEach(r => {
                 const typeColor = TYPE_COLORS[r.type] || '#888';
-                const actionColor = r.action === "開始" ? "#28a745" : "#dc3545";
+                const actionColor = (r.action === "開始" || r.action === "出發") ? "#28a745" : "#dc3545";
                 rowsHtml += `<tr>
                     <td>${r.date || ''}</td>
                     <td>${r.time || ''}</td>
