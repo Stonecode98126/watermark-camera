@@ -577,41 +577,114 @@
         async function drawMiniMap(ctx, x, y, size, lat, lon) {
             if (lat === null || lon === null) return;
             try {
-                // 使用 OSM 標準瓦片,zoom=15 約為社區尺度
-                const zoom = 15;
+                const zoom = 16;  // 街區規模
                 const n = Math.pow(2, zoom);
-                const xTile = Math.floor((lon + 180) / 360 * n);
-                const yTile = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1/Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n);
-                const tileUrl = `https://tile.openstreetmap.org/${zoom}/${xTile}/${yTile}.png`;
  
-                const img = new Image();
-                img.crossOrigin = "anonymous";
-                await new Promise((resolve, reject) => {
-                    img.onload = resolve;
-                    img.onerror = reject;
-                    img.src = tileUrl;
-                    setTimeout(reject, 3000);
-                });
+                // 計算精確的瓦片座標(浮點數,小數部分代表在瓦片內的相對位置)
+                const xTileExact = (lon + 180) / 360 * n;
+                const yTileExact = (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1/Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n;
+ 
+                // 中心瓦片(整數)
+                const xTileCenter = Math.floor(xTileExact);
+                const yTileCenter = Math.floor(yTileExact);
+ 
+                // 使用者在中心瓦片內的相對位置 (0~1)
+                const xFrac = xTileExact - xTileCenter;
+                const yFrac = yTileExact - yTileCenter;
+ 
+                // 抓 3×3 瓦片拼成大圖,確保使用者位置周圍都有地圖內容
+                // 拼接後共 768×768 px(3 × 256)
+                const TILE = 256;
+                const GRID = 3;  // 3×3
+                const fullSize = TILE * GRID;
+ 
+                // 建立離屏 canvas 拼貼瓦片
+                const offCanvas = document.createElement('canvas');
+                offCanvas.width = fullSize;
+                offCanvas.height = fullSize;
+                const offCtx = offCanvas.getContext('2d');
+ 
+                // 並行抓取 9 張瓦片
+                const tilePromises = [];
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        const tx = xTileCenter + dx;
+                        const ty = yTileCenter + dy;
+                        // 邊界檢查
+                        if (tx < 0 || ty < 0 || tx >= n || ty >= n) continue;
+                        const url = `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`;
+                        tilePromises.push(loadTile(url, dx, dy, offCtx, TILE));
+                    }
+                }
+                await Promise.all(tilePromises);
+ 
+                // 計算使用者在拼貼大圖中的精確像素位置(以中心瓦片為基準)
+                // 中心瓦片在拼貼圖中的左上角是 (TILE, TILE)
+                const userPxInFull = {
+                    x: TILE + xFrac * TILE,  // 中心瓦片起點 + 在瓦片內的偏移
+                    y: TILE + yFrac * TILE
+                };
+ 
+                // 從拼貼大圖裁切出「以使用者為中心」的視窗
+                // 視窗尺寸 = 與目標 size 相符的「來源像素數」(使用 1.5 倍比例可保留銳利度)
+                const sourceWindow = TILE * 1.5;  // 384 來源像素 → 縮成 size,保留高解析
+                const srcX = userPxInFull.x - sourceWindow / 2;
+                const srcY = userPxInFull.y - sourceWindow / 2;
  
                 // 繪製白色背景框
                 ctx.fillStyle = "rgba(255,255,255,0.95)";
                 ctx.fillRect(x - 3, y - 3, size + 6, size + 6);
  
-                // 繪製地圖
-                ctx.drawImage(img, x, y, size, size);
+                // 將拼貼後且使用者置中的區塊畫到主 canvas
+                ctx.drawImage(
+                    offCanvas,
+                    srcX, srcY, sourceWindow, sourceWindow,  // 來源
+                    x, y, size, size                          // 目標
+                );
  
-                // 繪製紅色定位點
-                ctx.fillStyle = "#e74c3c";
+                // 紅點正中央(因為已經把使用者位置置中)
+                const dotX = x + size / 2;
+                const dotY = y + size / 2;
+                const dotR = size * 0.06;
+ 
+                // 紅點外白圈
                 ctx.beginPath();
-                ctx.arc(x + size / 2, y + size / 2, size * 0.08, 0, Math.PI * 2);
+                ctx.arc(dotX, dotY, dotR + 2, 0, Math.PI * 2);
+                ctx.fillStyle = "white";
                 ctx.fill();
-                ctx.strokeStyle = "white";
-                ctx.lineWidth = 2;
-                ctx.stroke();
+ 
+                // 紅點本體
+                ctx.beginPath();
+                ctx.arc(dotX, dotY, dotR, 0, Math.PI * 2);
+                ctx.fillStyle = "#e74c3c";
+                ctx.fill();
+ 
+                // 中間白點(高亮)
+                ctx.beginPath();
+                ctx.arc(dotX, dotY, dotR * 0.35, 0, Math.PI * 2);
+                ctx.fillStyle = "white";
+                ctx.fill();
+ 
             } catch (e) {
-                // 地圖載入失敗就不繪製,不影響主流程
                 console.warn("小地圖載入失敗:", e);
             }
+        }
+ 
+        // 載入單張瓦片並繪製到指定位置
+        function loadTile(url, dx, dy, offCtx, tileSize) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.crossOrigin = "anonymous";
+                const drawX = (dx + 1) * tileSize;  // dx=-1 → 0, dx=0 → tile, dx=1 → 2*tile
+                const drawY = (dy + 1) * tileSize;
+                img.onload = () => {
+                    offCtx.drawImage(img, drawX, drawY, tileSize, tileSize);
+                    resolve();
+                };
+                img.onerror = () => resolve();  // 單張失敗不影響整體
+                img.src = url;
+                setTimeout(resolve, 4000);  // 超時保險
+            });
         }
  
         // ==================== 主題色轉 RGB(給底盒用) ====================
