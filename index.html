@@ -300,6 +300,7 @@
  
     <div id="status">正在檢查環境與定位...</div>
     <div id="weather-info">☁️ 天氣載入中...</div>
+    <div id="exif-debug" style="font-size:11px;padding:0 8px 3px;flex-shrink:0;">🔧 EXIF 狀態:檢查中...</div>
  
     <div class="type-switcher">
         <button class="type-btn active" data-type="screening" data-color="#28a745" data-label="吊掛">吊掛</button>
@@ -371,6 +372,23 @@
         let currentTypeLabel = "吊掛";
         let currentThemeColor = "#28a745";
         let lastPhotoBlob = null;  // 分享用
+
+        // ==================== EXIF 函式庫載入檢查(debug) ====================
+        const exifDebugDiv = document.getElementById('exif-debug');
+        function checkPiexifLoaded() {
+            if (typeof piexif !== 'undefined') {
+                exifDebugDiv.innerHTML = '🔧 EXIF: ✅ piexif 已載入,拍照會寫入 GPS';
+                exifDebugDiv.style.color = '#28a745';
+                return true;
+            } else {
+                exifDebugDiv.innerHTML = '🔧 EXIF: ❌ piexif 未載入(CDN 失敗?)';
+                exifDebugDiv.style.color = '#dc3545';
+                return false;
+            }
+        }
+        // 立刻檢查一次,2 秒後再檢查一次(以防 CDN 慢)
+        checkPiexifLoaded();
+        setTimeout(checkPiexifLoaded, 2000);
  
         const TYPE_EMOJI = {
             screening: "",
@@ -822,6 +840,7 @@
 
             // ==================== 寫入 EXIF (GPS + 拍攝時間 + 軟體資訊) ====================
             // 這段不更動上方任何浮水印 / 雜湊 / 紀錄邏輯,僅在輸出 base64 後追加 EXIF metadata
+            let exifStatus = "未寫入";
             try {
                 if (typeof piexif !== 'undefined') {
                     // 把十進位度數轉成 EXIF rational [[度,1],[分,1],[秒×100,100]]
@@ -859,6 +878,7 @@
                     }
 
                     // GPS IFD
+                    let hasGps = false;
                     if (currentLat !== null && currentLon !== null) {
                         gps[piexif.GPSIFD.GPSVersionID] = [2, 2, 0, 0];
                         gps[piexif.GPSIFD.GPSLatitudeRef] = currentLat >= 0 ? "N" : "S";
@@ -866,15 +886,22 @@
                         gps[piexif.GPSIFD.GPSLongitudeRef] = currentLon >= 0 ? "E" : "W";
                         gps[piexif.GPSIFD.GPSLongitude] = degToDmsRational(currentLon);
                         gps[piexif.GPSIFD.GPSDateStamp] = `${now.getUTCFullYear()}:${pad(now.getUTCMonth()+1)}:${pad(now.getUTCDate())}`;
+                        hasGps = true;
                     }
 
                     const exifObj = { "0th": zeroth, "Exif": exifIfd, "GPS": gps };
                     const exifBytes = piexif.dump(exifObj);
                     imgUrl = piexif.insert(exifBytes, imgUrl);
+                    exifStatus = hasGps ? "✅ 含 GPS" : "✅ 無 GPS(尚未定位)";
+                } else {
+                    exifStatus = "❌ piexif 未載入";
                 }
             } catch (e) {
                 console.warn("EXIF 寫入失敗(將輸出無 EXIF 的照片):", e);
+                exifStatus = "❌ 錯誤:" + e.message;
             }
+            // 顯示 EXIF 寫入結果
+            showToast(`EXIF 寫入:${exifStatus}`, 3500);
             // ==================== EXIF 結束 ====================
 
             photo.src = imgUrl;
