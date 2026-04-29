@@ -11,6 +11,8 @@
     <title>工作定位相機</title>
     <!-- PWA manifest:讓加到主畫面的捷徑以獨立 App 視窗開啟,避免每次點都開新分頁 -->
     <link rel="manifest" href='data:application/manifest+json;charset=utf-8,{"name":"工作定位相機","short_name":"工作相機","start_url":".","scope":".","display":"standalone","orientation":"portrait","background_color":"%23f0f2f5","theme_color":"%2328a745","icons":[{"src":"data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 192 192%22%3E%3Crect width=%22192%22 height=%22192%22 rx=%2240%22 fill=%22%2328a745%22/%3E%3Cg fill=%22white%22%3E%3Crect x=%2240%22 y=%2260%22 width=%22112%22 height=%2280%22 rx=%2210%22/%3E%3Ccircle cx=%2296%22 cy=%22100%22 r=%2224%22 fill=%22%2328a745%22/%3E%3Ccircle cx=%2296%22 cy=%22100%22 r=%2216%22 fill=%22white%22/%3E%3Crect x=%2280%22 y=%2250%22 width=%2232%22 height=%2218%22 rx=%224%22/%3E%3C/g%3E%3C/svg%3E","sizes":"192x192","type":"image/svg+xml","purpose":"any"},{"src":"data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 512 512%22%3E%3Crect width=%22512%22 height=%22512%22 rx=%22100%22 fill=%22%2328a745%22/%3E%3Cg fill=%22white%22%3E%3Crect x=%22106%22 y=%22160%22 width=%22300%22 height=%22212%22 rx=%2226%22/%3E%3Ccircle cx=%22256%22 cy=%22266%22 r=%2264%22 fill=%22%2328a745%22/%3E%3Ccircle cx=%22256%22 cy=%22266%22 r=%2242%22 fill=%22white%22/%3E%3Crect x=%22214%22 y=%22134%22 width=%2284%22 height=%2248%22 rx=%2210%22/%3E%3C/g%3E%3C/svg%3E","sizes":"512x512","type":"image/svg+xml","purpose":"any"}]}'>
+    <!-- piexifjs:用於將 GPS / 拍攝時間等資訊寫入 JPEG 的 EXIF -->
+    <script src="https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.min.js"></script>
     <style>
         * { box-sizing: border-box; }
         html, body {
@@ -816,7 +818,65 @@
             ctx.fillText(`🔐 ${hash}`, textLeft, cursorY);
  
             // 最終輸出
-            const imgUrl = canvas.toDataURL('image/jpeg', 0.95);
+            let imgUrl = canvas.toDataURL('image/jpeg', 0.95);
+
+            // ==================== 寫入 EXIF (GPS + 拍攝時間 + 軟體資訊) ====================
+            // 這段不更動上方任何浮水印 / 雜湊 / 紀錄邏輯,僅在輸出 base64 後追加 EXIF metadata
+            try {
+                if (typeof piexif !== 'undefined') {
+                    // 把十進位度數轉成 EXIF rational [[度,1],[分,1],[秒×100,100]]
+                    const degToDmsRational = (deg) => {
+                        const absDeg = Math.abs(deg);
+                        const d = Math.floor(absDeg);
+                        const minFloat = (absDeg - d) * 60;
+                        const m = Math.floor(minFloat);
+                        const s = Math.round((minFloat - m) * 60 * 100);
+                        return [[d, 1], [m, 1], [s, 100]];
+                    };
+                    const pad = n => String(n).padStart(2, '0');
+                    const exifDateTime = `${now.getFullYear()}:${pad(now.getMonth()+1)}:${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
+                    const zeroth = {};
+                    const exifIfd = {};
+                    const gps = {};
+
+                    // 0th IFD:基本資訊
+                    zeroth[piexif.ImageIFD.Make] = "Stonecode";
+                    zeroth[piexif.ImageIFD.Model] = "WorkCam Web";
+                    zeroth[piexif.ImageIFD.Software] = "工作定位相機";
+                    zeroth[piexif.ImageIFD.DateTime] = exifDateTime;
+                    if (currentAddress) {
+                        // ImageDescription 不能含換行,且最好用 ASCII 安全字元;這裡盡量寫進去,若不支援會被 piexif 忽略
+                        zeroth[piexif.ImageIFD.ImageDescription] = `${currentTypeLabel} ${startOrEnd} | ${currentAddress}`;
+                    }
+
+                    // Exif IFD:拍攝時間(很多檢視器只認這兩個欄位)
+                    exifIfd[piexif.ExifIFD.DateTimeOriginal] = exifDateTime;
+                    exifIfd[piexif.ExifIFD.DateTimeDigitized] = exifDateTime;
+                    if (noteText) {
+                        // UserComment 需要 ASCII 前綴 "ASCII\0\0\0";piexif 會幫忙處理,我們直接給文字
+                        exifIfd[piexif.ExifIFD.UserComment] = "ASCII\0\0\0" + noteText;
+                    }
+
+                    // GPS IFD
+                    if (currentLat !== null && currentLon !== null) {
+                        gps[piexif.GPSIFD.GPSVersionID] = [2, 2, 0, 0];
+                        gps[piexif.GPSIFD.GPSLatitudeRef] = currentLat >= 0 ? "N" : "S";
+                        gps[piexif.GPSIFD.GPSLatitude] = degToDmsRational(currentLat);
+                        gps[piexif.GPSIFD.GPSLongitudeRef] = currentLon >= 0 ? "E" : "W";
+                        gps[piexif.GPSIFD.GPSLongitude] = degToDmsRational(currentLon);
+                        gps[piexif.GPSIFD.GPSDateStamp] = `${now.getUTCFullYear()}:${pad(now.getUTCMonth()+1)}:${pad(now.getUTCDate())}`;
+                    }
+
+                    const exifObj = { "0th": zeroth, "Exif": exifIfd, "GPS": gps };
+                    const exifBytes = piexif.dump(exifObj);
+                    imgUrl = piexif.insert(exifBytes, imgUrl);
+                }
+            } catch (e) {
+                console.warn("EXIF 寫入失敗(將輸出無 EXIF 的照片):", e);
+            }
+            // ==================== EXIF 結束 ====================
+
             photo.src = imgUrl;
             downloadBtn.href = imgUrl;
  
