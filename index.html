@@ -905,20 +905,27 @@
             // ==================== EXIF 結束 ====================
 
             photo.src = imgUrl;
-            downloadBtn.href = imgUrl;
- 
+
             const safeNote = hasNote ? "_" + noteText.replace(/[\\/:*?"<>|\s]/g, '').substring(0, 10) : "";
             const fileName = `Job_${currentTypeLabel}_${startOrEnd}${safeNote}_${dateStr}_${timeStr.replace(/:/g,'')}.jpg`;
             downloadBtn.download = fileName;
- 
+
             fileInfoDiv.innerText = `${targetWidth}×${targetHeight} | ${getBase64Size(imgUrl)} | 🔐${hash}`;
- 
-            // 轉 Blob 用於分享
+
+            // 轉 Blob (用於分享 + 下載)
+            // 重要:downloadBtn.href 改用 Blob URL 而非 base64 data URL,
+            // 因為 Android Chrome 在下載 base64 data URL 時會重新編碼 JPEG,導致 EXIF 被剝除
             try {
                 const blob = await (await fetch(imgUrl)).blob();
                 lastPhotoBlob = new File([blob], fileName, { type: 'image/jpeg' });
+                // 釋放上一張的 Blob URL,避免記憶體洩漏
+                if (downloadBtn.href && downloadBtn.href.startsWith('blob:')) {
+                    URL.revokeObjectURL(downloadBtn.href);
+                }
+                downloadBtn.href = URL.createObjectURL(blob);
             } catch (e) {
                 lastPhotoBlob = null;
+                downloadBtn.href = imgUrl;  // fallback
             }
  
             // 寫入紀錄(localStorage)
