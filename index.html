@@ -521,7 +521,14 @@
         }
  
         // ==================== 相機 ====================
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+        // 解析度開到最高:向相機要求最大可用尺寸(ideal 會自動退回裝置支援的最高值)
+        navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: "environment",
+                    width: { ideal: 7680 },
+                    height: { ideal: 4320 }
+                }
+            })
             .then(stream => {
                 video.srcObject = stream;
                 videoTrack = stream.getVideoTracks()[0];
@@ -577,7 +584,7 @@
         async function drawMiniMap(ctx, x, y, size, lat, lon) {
             if (lat === null || lon === null) return;
             try {
-                const zoom = 16;  // 建築輪廓級,最清晰
+                const zoom = 18;  // 由 16 → 18,街道/建築最高細節
                 const n = Math.pow(2, zoom);
  
                 // 計算精確的瓦片座標(浮點數,小數部分代表在瓦片內的相對位置)
@@ -592,10 +599,11 @@
                 const xFrac = xTileExact - xTileCenter;
                 const yFrac = yTileExact - yTileCenter;
  
-                // 抓 3×3 瓦片拼成大圖,確保使用者位置周圍都有地圖內容
-                // 拼接後共 768×768 px(3 × 256)
+                // 抓 7×7 瓦片拼成大圖,確保使用者位置周圍都有地圖內容
+                // 拼接後共 1792×1792 px(7 × 256)
                 const TILE = 256;
-                const GRID = 3;  // 3×3
+                const GRID_RADIUS = 3;            // 中心向外各 3 格 → 7×7
+                const GRID = GRID_RADIUS * 2 + 1; // 7
                 const fullSize = TILE * GRID;
  
                 // 建立離屏 canvas 拼貼瓦片
@@ -604,30 +612,31 @@
                 offCanvas.height = fullSize;
                 const offCtx = offCanvas.getContext('2d');
  
-                // 並行抓取 9 張瓦片
+                // 並行抓取 49 張瓦片
                 const tilePromises = [];
-                for (let dy = -1; dy <= 1; dy++) {
-                    for (let dx = -1; dx <= 1; dx++) {
+                for (let dy = -GRID_RADIUS; dy <= GRID_RADIUS; dy++) {
+                    for (let dx = -GRID_RADIUS; dx <= GRID_RADIUS; dx++) {
                         const tx = xTileCenter + dx;
                         const ty = yTileCenter + dy;
                         // 邊界檢查
                         if (tx < 0 || ty < 0 || tx >= n || ty >= n) continue;
                         const url = `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`;
-                        tilePromises.push(loadTile(url, dx, dy, offCtx, TILE));
+                        tilePromises.push(loadTile(url, dx, dy, offCtx, TILE, GRID_RADIUS));
                     }
                 }
                 await Promise.all(tilePromises);
  
                 // 計算使用者在拼貼大圖中的精確像素位置(以中心瓦片為基準)
-                // 中心瓦片在拼貼圖中的左上角是 (TILE, TILE)
+                // 中心瓦片在拼貼圖中的左上角是 (GRID_RADIUS*TILE, GRID_RADIUS*TILE)
                 const userPxInFull = {
-                    x: TILE + xFrac * TILE,  // 中心瓦片起點 + 在瓦片內的偏移
-                    y: TILE + yFrac * TILE
+                    x: GRID_RADIUS * TILE + xFrac * TILE,
+                    y: GRID_RADIUS * TILE + yFrac * TILE
                 };
  
                 // 從拼貼大圖裁切出「以使用者為中心」的視窗
-                // 視窗尺寸 = 與目標 size 相符的「來源像素數」(使用 1.5 倍比例可保留銳利度)
-                const sourceWindow = TILE * 1.5;  // 384 來源像素 → 縮成 size,保留高解析
+                // 維持與原本相同的地面涵蓋範圍(原 zoom16 取 1.5 格 = 384 源像素)。
+                // zoom 每 +1,同地面範圍需要 2× 來源像素;18-16=2 → ×4 → 384×4 = 1536。
+                const sourceWindow = 1536;  // 1536 源像素 → 縮成 size,4× 解析度
                 const srcX = userPxInFull.x - sourceWindow / 2;
                 const srcY = userPxInFull.y - sourceWindow / 2;
  
@@ -671,12 +680,12 @@
         }
  
         // 載入單張瓦片並繪製到指定位置
-        function loadTile(url, dx, dy, offCtx, tileSize) {
+        function loadTile(url, dx, dy, offCtx, tileSize, gridRadius) {
             return new Promise((resolve) => {
                 const img = new Image();
                 img.crossOrigin = "anonymous";
-                const drawX = (dx + 1) * tileSize;  // dx=-1 → 0, dx=0 → tile, dx=1 → 2*tile
-                const drawY = (dy + 1) * tileSize;
+                const drawX = (dx + gridRadius) * tileSize;  // dx=-radius → 0 ... dx=+radius → (2*radius)*tile
+                const drawY = (dy + gridRadius) * tileSize;
                 img.onload = () => {
                     offCtx.drawImage(img, drawX, drawY, tileSize, tileSize);
                     resolve();
@@ -703,7 +712,7 @@
             }
  
             const ctx = canvas.getContext('2d');
-            const MAX_WIDTH = 2560;
+            const MAX_WIDTH = 7680;  // 解析度上限拉到 8K 寬,實質保留相機原生最高解析度
             const vw = video.videoWidth;
             const vh = video.videoHeight;
             let targetWidth = vw, targetHeight = vh;
