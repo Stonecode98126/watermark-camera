@@ -2,923 +2,297 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="工作相機">
-    <meta name="theme-color" content="#28a745">
-    <title>工作定位相機</title>
-    <!-- PWA manifest:讓加到主畫面的捷徑以獨立 App 視窗開啟,避免每次點都開新分頁 -->
-    <link rel="manifest" href='data:application/manifest+json;charset=utf-8,{"name":"工作定位相機","short_name":"工作相機","start_url":".","scope":".","display":"standalone","orientation":"portrait","background_color":"%23f0f2f5","theme_color":"%2328a745","icons":[{"src":"data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 192 192%22%3E%3Crect width=%22192%22 height=%22192%22 rx=%2240%22 fill=%22%2328a745%22/%3E%3Cg fill=%22white%22%3E%3Crect x=%2240%22 y=%2260%22 width=%22112%22 height=%2280%22 rx=%2210%22/%3E%3Ccircle cx=%2296%22 cy=%22100%22 r=%2224%22 fill=%22%2328a745%22/%3E%3Ccircle cx=%2296%22 cy=%22100%22 r=%2216%22 fill=%22white%22/%3E%3Crect x=%2280%22 y=%2250%22 width=%2232%22 height=%2218%22 rx=%224%22/%3E%3C/g%3E%3C/svg%3E","sizes":"192x192","type":"image/svg+xml","purpose":"any"},{"src":"data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 512 512%22%3E%3Crect width=%22512%22 height=%22512%22 rx=%22100%22 fill=%22%2328a745%22/%3E%3Cg fill=%22white%22%3E%3Crect x=%22106%22 y=%22160%22 width=%22300%22 height=%22212%22 rx=%2226%22/%3E%3Ccircle cx=%22256%22 cy=%22266%22 r=%2264%22 fill=%22%2328a745%22/%3E%3Ccircle cx=%22256%22 cy=%22266%22 r=%2242%22 fill=%22white%22/%3E%3Crect x=%22214%22 y=%22134%22 width=%2284%22 height=%2248%22 rx=%2210%22/%3E%3C/g%3E%3C/svg%3E","sizes":"512x512","type":"image/svg+xml","purpose":"any"}]}'>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>iPhone 定位測試</title>
     <style>
-        * { box-sizing: border-box; }
-        html, body {
-            margin: 0; padding: 0;
-            width: 100%; height: 100%;
-            overflow: hidden;
-            font-family: -apple-system, system-ui, sans-serif;
-            background: #f0f2f5;
-            -webkit-user-select: none;
-            user-select: none;
-        }
-        body {
-            display: flex;
-            flex-direction: column;
-            padding: 8px;
-        }
- 
-        /* 主題色動態變數 */
         :root {
-            --theme-color: #28a745;
+            --bg: #0f1418;
+            --panel: #1a2127;
+            --line: #2b353d;
+            --ink: #e8eef2;
+            --muted: #8a99a5;
+            --accent: #3ea6ff;
+            --ok: #34c77b;
+            --warn: #e6a23c;
+            --err: #f56c6c;
+            --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
         }
- 
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 4px 8px;
-            flex-shrink: 0;
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            margin: 0;
+            padding: max(16px, env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
+            background: var(--bg);
+            color: var(--ink);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Noto Sans TC", sans-serif;
+            line-height: 1.55;
+            max-width: 560px;
+            margin-inline: auto;
         }
-        .title { font-size: 16px; font-weight: bold; color: #333; }
-        .header-right { display: flex; gap: 6px; align-items: center; }
-        .badge { background: #000; color: #fff; padding: 3px 8px; border-radius: 10px; font-size: 10px; }
-        .stats-link {
-            background: #007AFF; color: #fff;
-            padding: 4px 10px; border-radius: 10px;
-            font-size: 11px; text-decoration: none;
-            font-weight: bold;
+        h1 {
+            font-size: 19px;
+            font-weight: 600;
+            margin: 4px 0 2px;
+            letter-spacing: .3px;
         }
- 
-        #status {
-            font-size: 11px;
-            color: #555;
-            padding: 3px 8px;
-            line-height: 1.3;
-            flex-shrink: 0;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+        .sub { color: var(--muted); font-size: 13px; margin: 0 0 18px; }
+
+        /* 安全環境橫幅 */
+        .banner {
+            display: flex; gap: 10px; align-items: flex-start;
+            padding: 12px 14px; border-radius: 12px;
+            font-size: 13px; margin-bottom: 16px;
+            border: 1px solid var(--line);
         }
-        #weather-info {
-            font-size: 11px;
-            color: #666;
-            padding: 0 8px 3px;
-            flex-shrink: 0;
+        .banner.ok   { background: rgba(52,199,123,.08); border-color: rgba(52,199,123,.35); color: #a9e9c6; }
+        .banner.warn { background: rgba(230,162,60,.09); border-color: rgba(230,162,60,.4);  color: #f0d19a; }
+        .banner .dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; }
+        .banner.ok   .dot { background: var(--ok); }
+        .banner.warn .dot { background: var(--warn); }
+
+        .controls { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+        button {
+            font: inherit; font-weight: 600; font-size: 16px;
+            color: #04121e; background: var(--accent);
+            border: 0; border-radius: 14px;
+            padding: 15px 18px; cursor: pointer;
+            transition: transform .08s ease, opacity .15s ease;
+            touch-action: manipulation;
         }
- 
-        /* 工作類型切換 */
-        .type-switcher {
-            display: flex;
-            gap: 4px;
-            padding: 0 2px;
-            margin-bottom: 4px;
-            flex-shrink: 0;
+        button:active { transform: scale(.98); }
+        button:disabled { opacity: .5; cursor: default; }
+        button.ghost { background: var(--panel); color: var(--ink); border: 1px solid var(--line); }
+
+        .toggle {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 13px 16px; background: var(--panel);
+            border: 1px solid var(--line); border-radius: 14px;
+            font-size: 14px; color: var(--ink);
         }
-        .type-btn {
-            flex: 1;
-            padding: 6px 4px;
-            border: 2px solid transparent;
-            border-radius: 8px;
-            background: #fff;
-            font-size: 12px;
-            font-weight: bold;
-            cursor: pointer;
-            color: #666;
-            transition: 0.15s;
+        .toggle input { width: 44px; height: 26px; accent-color: var(--accent); }
+
+        /* 狀態列 */
+        .status {
+            display: flex; align-items: center; gap: 9px;
+            font-size: 14px; color: var(--muted);
+            padding: 12px 4px; min-height: 22px;
         }
-        .type-btn.active {
-            color: white;
-            transform: scale(1.02);
+        .spinner {
+            width: 15px; height: 15px; border-radius: 50%;
+            border: 2px solid var(--line); border-top-color: var(--accent);
+            animation: spin .8s linear infinite; flex: 0 0 auto;
         }
-        .type-btn.active[data-type="screening"] { background: #28a745; border-color: #1c7532; }
-        .type-btn.active[data-type="meeting"] { background: #007AFF; border-color: #0051a3; }
-        .type-btn.active[data-type="admin"] { background: #8e44ad; border-color: #5e2d78; }
-        .type-btn.active[data-type="transit"] { background: #fd7e14; border-color: #b35600; }
- 
-        .video-wrap {
-            flex: 1;
-            min-height: 0;
-            background: #000;
-            border-radius: 10px;
-            overflow: hidden;
-            position: relative;
-            margin: 4px 0;
-            border: 3px solid var(--theme-color);
-            transition: border-color 0.3s;
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .status.err  { color: #f2a6a6; }
+        .status.done { color: var(--ok); }
+
+        /* 結果卡 */
+        .card {
+            background: var(--panel); border: 1px solid var(--line);
+            border-radius: 16px; overflow: hidden;
+            opacity: 0; max-height: 0; transition: opacity .25s ease;
         }
-        video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
+        .card.show { opacity: 1; max-height: none; }
+        .row {
+            display: flex; justify-content: space-between; align-items: baseline;
+            gap: 12px; padding: 13px 16px; border-bottom: 1px solid var(--line);
         }
- 
-        .zoom-overlay {
-            position: absolute;
-            bottom: 10px;
-            left: 10px;
-            right: 10px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(0,0,0,0.5);
-            padding: 6px 12px;
-            border-radius: 20px;
+        .row:last-child { border-bottom: 0; }
+        .row .k { color: var(--muted); font-size: 13px; flex: 0 0 auto; }
+        .row .v { font-family: var(--mono); font-size: 15px; text-align: right; word-break: break-all; }
+        .row .v.big { font-size: 17px; }
+        .accuracy-good { color: var(--ok); }
+        .accuracy-mid  { color: var(--warn); }
+        .accuracy-bad  { color: #f2a6a6; }
+
+        .card-actions { display: flex; gap: 10px; padding: 14px 16px; }
+        .card-actions a, .card-actions button {
+            flex: 1; text-align: center; text-decoration: none;
+            font-size: 14px; padding: 12px; border-radius: 12px;
         }
-        .zoom-label {
-            color: white;
-            font-size: 13px;
-            font-weight: bold;
-            min-width: 36px;
-            text-align: center;
+        .card-actions a {
+            background: transparent; color: var(--accent);
+            border: 1px solid var(--line); font-weight: 600;
+            display: flex; align-items: center; justify-content: center;
         }
-        #zoom-slider {
-            flex: 1;
-            -webkit-appearance: none;
-            appearance: none;
-            height: 4px;
-            background: rgba(255,255,255,0.4);
-            border-radius: 2px;
-            outline: none;
-        }
-        #zoom-slider::-webkit-slider-thumb {
-            -webkit-appearance: none; appearance: none;
-            width: 20px; height: 20px;
-            background: #fff; border-radius: 50%;
-            cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-        }
-        #zoom-slider::-moz-range-thumb {
-            width: 20px; height: 20px;
-            background: #fff; border-radius: 50%;
-            cursor: pointer; border: none;
-        }
- 
-        .note-section {
-            flex-shrink: 0;
-            margin: 4px 0;
-        }
-        #note-input {
-            width: 100%;
-            padding: 10px 12px;
-            font-size: 14px;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            background: #fff;
-            font-family: inherit;
-        }
-        #note-input:focus { outline: none; border-color: var(--theme-color); }
- 
-        .btn-group {
-            display: flex;
-            gap: 8px;
-            flex-shrink: 0;
-        }
-        .action-btn {
-            flex: 1;
-            padding: 14px 8px;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: bold;
-            color: white;
-            cursor: pointer;
-        }
-        .action-btn:active { transform: scale(0.97); }
-        #snap-start { background: #28a745; }
-        #snap-end { background: #dc3545; }
- 
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.9);
-            z-index: 1000;
-            flex-direction: column;
-            padding: 12px;
-        }
-        .modal.active { display: flex; }
-        .modal-title {
-            color: white;
-            text-align: center;
-            margin: 4px 0 8px;
-            font-size: 15px;
-        }
-        .modal-img-wrap {
-            flex: 1;
-            min-height: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-        }
-        #photo {
-            max-width: 100%;
-            max-height: 100%;
-            border-radius: 8px;
-        }
-        #file-info {
-            color: rgba(255,255,255,0.7);
-            font-size: 10px;
-            text-align: center;
-            padding: 6px 0;
-        }
-        .modal-btns {
-            display: flex;
-            gap: 6px;
-            flex-wrap: wrap;
-        }
-        .modal-btn {
-            flex: 1;
-            min-width: 90px;
-            padding: 12px 6px;
-            border-radius: 10px;
-            font-size: 13px;
-            font-weight: bold;
-            text-align: center;
-            text-decoration: none;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-        .btn-save { background: #ff9500; }
-        .btn-share { background: #007AFF; }
-        .btn-close { background: #666; }
- 
-        #browser-guide {
-            display: none;
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9);
-            color: white;
-            z-index: 9999;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            padding: 30px;
-        }
- 
-        /* Toast 提示 */
-        #toast {
-            position: fixed;
-            bottom: 80px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.85);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 20px;
-            font-size: 13px;
-            z-index: 2000;
-            opacity: 0;
-            transition: opacity 0.3s;
-            pointer-events: none;
-        }
-        #toast.show { opacity: 1; }
+        .hint { color: var(--muted); font-size: 12px; margin-top: 16px; }
+        .hint code { background: var(--panel); padding: 1px 6px; border-radius: 5px; font-size: 11px; }
     </style>
 </head>
 <body>
- 
-    <div id="browser-guide">
-        <div style="font-size: 40px;">↗️</div>
-        <h2>請使用 Chrome 開啟</h2>
-        <p>偵測到內建瀏覽器,這會導致 GPS 無法運作。</p>
-        <p>請點擊右上角「...」<br>選擇「在瀏覽器中開啟」</p>
+    <h1>iPhone 網頁定位測試</h1>
+    <p class="sub">高精準度 GPS 定位 · 支援即時追蹤</p>
+
+    <!-- 安全環境提示（HTTPS 檢查） -->
+    <div id="secBanner" class="banner" hidden>
+        <span class="dot"></span>
+        <span id="secText"></span>
     </div>
- 
-    <div class="header">
-        <div class="title">工作定位相機</div>
-        <div class="header-right">
-            <a href="stats.html" class="stats-link">📊 統計</a>
-            <span class="badge">Stonecode</span>
+
+    <div class="controls">
+        <button id="btnLocate" onclick="getLocation()">取得我的位置</button>
+        <label class="toggle">
+            <span>持續追蹤（移動時自動更新）</span>
+            <input type="checkbox" id="watchToggle" onchange="toggleWatch()">
+        </label>
+    </div>
+
+    <div id="status" class="status">點擊上方按鈕開始定位…</div>
+
+    <div id="card" class="card">
+        <div class="row"><span class="k">緯度 Latitude</span><span class="v big" id="lat">—</span></div>
+        <div class="row"><span class="k">經度 Longitude</span><span class="v big" id="lng">—</span></div>
+        <div class="row"><span class="k">準確率</span><span class="v" id="acc">—</span></div>
+        <div class="row"><span class="k">海拔高度</span><span class="v" id="alt">—</span></div>
+        <div class="row"><span class="k">移動速度</span><span class="v" id="spd">—</span></div>
+        <div class="row"><span class="k">取得時間</span><span class="v" id="time">—</span></div>
+        <div class="card-actions">
+            <a id="mapLink" href="#" target="_blank" rel="noopener">在地圖開啟</a>
+            <button class="ghost" onclick="copyCoords()" id="copyBtn">複製座標</button>
         </div>
     </div>
- 
-    <div id="status">正在檢查環境與定位...</div>
-    <div id="weather-info">☁️ 天氣載入中...</div>
- 
-    <div class="type-switcher">
-        <button class="type-btn active" data-type="screening" data-color="#28a745" data-label="吊掛">吊掛</button>
-        <button class="type-btn" data-type="meeting" data-color="#007AFF" data-label="安裝">安裝</button>
-        <button class="type-btn" data-type="admin" data-color="#8e44ad" data-label="固定籃">固定籃</button>
-        <button class="type-btn" data-type="transit" data-color="#fd7e14" data-label="移動">移動</button>
-    </div>
- 
-    <div class="video-wrap">
-        <video id="video" autoplay playsinline muted></video>
-        <div class="zoom-overlay">
-            <span style="color:white;font-size:12px;">🔍</span>
-            <input type="range" id="zoom-slider" min="1" max="4" step="0.1" value="1">
-            <span class="zoom-label" id="zoom-label">1.0x</span>
-        </div>
-    </div>
- 
-    <div class="note-section">
-        <input type="text" id="note-input" placeholder="備註 (選填)..." maxlength="30">
-    </div>
- 
-    <div class="btn-group">
-        <button id="snap-start" class="action-btn">🚀 開始工作</button>
-        <button id="snap-end" class="action-btn">🏁 結束工作</button>
-    </div>
- 
-    <div id="preview-modal" class="modal">
-        <div class="modal-title">照片預覽</div>
-        <div class="modal-img-wrap">
-            <img id="photo">
-        </div>
-        <div id="file-info"></div>
-        <div class="modal-btns">
-            <button class="modal-btn btn-close" id="close-preview">關閉</button>
-            <button class="modal-btn btn-share" id="share-btn">📤 分享</button>
-            <a id="downloadBtn" class="modal-btn btn-save">💾 儲存</a>
-        </div>
-    </div>
- 
-    <div id="toast"></div>
-    <canvas id="canvas" style="display:none;"></canvas>
- 
+
+    <p class="hint">
+        提示：iPhone 只在 <code>https://</code> 網頁允許定位。若用 <code>file://</code> 直接開檔會失敗，
+        請上傳到 Netlify / GitHub Pages 等 HTTPS 空間再測試。
+    </p>
+
     <script>
-        // ==================== 全域變數 ====================
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const photo = document.getElementById('photo');
-        const downloadBtn = document.getElementById('downloadBtn');
-        const shareBtn = document.getElementById('share-btn');
-        const statusDiv = document.getElementById('status');
-        const weatherDiv = document.getElementById('weather-info');
-        const fileInfoDiv = document.getElementById('file-info');
-        const guide = document.getElementById('browser-guide');
-        const noteInput = document.getElementById('note-input');
-        const zoomSlider = document.getElementById('zoom-slider');
-        const zoomLabel = document.getElementById('zoom-label');
-        const previewModal = document.getElementById('preview-modal');
-        const toast = document.getElementById('toast');
- 
-        let currentAddress = "定位搜尋中...";
-        let latLon = "";
-        let currentLat = null;
-        let currentLon = null;
-        let weatherText = "";
-        let videoTrack = null;
-        let hardwareZoomSupported = false;
-        let currentZoom = 1.0;
-        let currentWorkType = "screening";
-        let currentTypeLabel = "吊掛";
-        let currentThemeColor = "#28a745";
-        let lastPhotoBlob = null;  // 分享用
- 
-        const TYPE_EMOJI = {
-            screening: "",
-            meeting: "",
-            admin: "",
-            transit: ""
-        };
- 
-        // ==================== Toast ====================
-        function showToast(msg, duration = 2000) {
-            toast.innerText = msg;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), duration);
+    // ── 定位參數（對 iPhone GPS 特別重要）──────────────
+    const options = {
+        enableHighAccuracy: true, // 強制使用 GPS 精準定位，而非基地台模糊定位
+        timeout: 15000,           // 逾時時間：15 秒（iPhone 首次抓 GPS 可能較久）
+        maximumAge: 0             // 每次都抓最新位置，不使用快取
+    };
+
+    let watchId = null;      // 持續追蹤的 handle
+    let lastCoords = null;   // 給「複製座標」用
+
+    // ── 啟動時：檢查是否在安全環境（HTTPS）─────────────
+    (function checkSecureContext() {
+        const banner = document.getElementById("secBanner");
+        const text = document.getElementById("secText");
+        if (!navigator.geolocation) {
+            banner.hidden = false; banner.className = "banner warn";
+            text.textContent = "您的瀏覽器不支援定位功能。";
+            document.getElementById("btnLocate").disabled = true;
+            return;
         }
- 
-        // ==================== 環境檢測 ====================
-        const ua = navigator.userAgent || navigator.vendor || window.opera;
-        const isAppBrowser = (ua.indexOf("Line") > -1) || (ua.indexOf("FBAN") > -1) ||
-                             (ua.indexOf("FBAV") > -1) || (ua.indexOf("Instagram") > -1);
-        if (isAppBrowser) { guide.style.display = 'flex'; }
- 
-        // ==================== 工作類型切換 ====================
-        // 啟動時從 HTML 上 active 的按鈕讀取預設值,避免 HTML/JS 不同步
-        const defaultBtn = document.querySelector('.type-btn.active');
-        if (defaultBtn) {
-            currentWorkType = defaultBtn.dataset.type;
-            currentTypeLabel = defaultBtn.dataset.label;
-            currentThemeColor = defaultBtn.dataset.color;
-            document.documentElement.style.setProperty('--theme-color', currentThemeColor);
+        if (window.isSecureContext) {
+            banner.hidden = false; banner.className = "banner ok";
+            text.textContent = "環境正常（HTTPS），可正常請求定位。";
+        } else {
+            banner.hidden = false; banner.className = "banner warn";
+            text.textContent = "目前不是安全環境（非 HTTPS）。iPhone 可能會拒絕定位，請改用 HTTPS 網址開啟。";
         }
- 
-        // 根據類型更新主按鈕文字(移動 → 出發/抵達,其他 → 開始/結束)
-        function updateActionButtonLabels() {
-            const snapStart = document.getElementById('snap-start');
-            const snapEnd = document.getElementById('snap-end');
-            if (currentWorkType === 'transit') {
-                snapStart.innerText = '🚀 出發';
-                snapEnd.innerText = '🏁 抵達';
-            } else {
-                snapStart.innerText = '🚀 開始工作';
-                snapEnd.innerText = '🏁 結束工作';
-            }
+    })();
+
+    // ── 單次定位 ─────────────────────────────────────
+    function getLocation() {
+        if (!navigator.geolocation) {
+            setStatus("您的瀏覽器不支援定位功能。", "err");
+            return;
         }
-        updateActionButtonLabels();
- 
-        document.querySelectorAll('.type-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                currentWorkType = btn.dataset.type;
-                currentTypeLabel = btn.dataset.label;
-                currentThemeColor = btn.dataset.color;
-                document.documentElement.style.setProperty('--theme-color', currentThemeColor);
-                updateActionButtonLabels();
-            });
-        });
- 
-        // ==================== GPS + 天氣 ====================
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(async (pos) => {
-                currentLat = pos.coords.latitude;
-                currentLon = pos.coords.longitude;
-                latLon = `GPS: ${currentLat.toFixed(5)}, ${currentLon.toFixed(5)}`;
- 
-                // 地址解析(使用 addressdetails 結構化欄位,精確過濾不要的層級)
-                try {
-                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&addressdetails=1&lat=${currentLat}&lon=${currentLon}&accept-language=zh-TW`);
-                    const data = await res.json();
-                    currentAddress = formatTWAddress(data);
-                    statusDiv.innerText = `📍 ${currentAddress}`;
-                } catch (e) {
-                    currentAddress = "地址解析暫時不可用";
-                    statusDiv.innerText = "📍 " + latLon;
-                }
- 
-                // 天氣(使用 open-meteo,免 API Key)
-                try {
-                    const wRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${currentLat}&longitude=${currentLon}&current=temperature_2m,weather_code,wind_speed_10m&timezone=auto`);
-                    const wData = await wRes.json();
-                    const temp = wData.current.temperature_2m;
-                    const wCode = wData.current.weather_code;
-                    const wInfo = weatherCodeToText(wCode);
-                    weatherText = `${wInfo.emoji} ${wInfo.text} ${temp}°C`;
-                    weatherDiv.innerText = weatherText;
-                } catch (e) {
-                    weatherDiv.innerText = "☁️ 天氣資訊暫不可用";
-                    weatherText = "";
-                }
-            }, () => {
-                statusDiv.innerText = "❌ 請允許 GPS 定位權限";
-                weatherDiv.innerText = "";
-            }, { enableHighAccuracy: true });
-        }
- 
-        function weatherCodeToText(code) {
-            // WMO 天氣代碼對應
-            if (code === 0) return { emoji: "☀️", text: "晴朗" };
-            if (code <= 3) return { emoji: "⛅", text: "多雲" };
-            if (code <= 48) return { emoji: "🌫️", text: "霧" };
-            if (code <= 57) return { emoji: "🌦️", text: "毛毛雨" };
-            if (code <= 67) return { emoji: "🌧️", text: "下雨" };
-            if (code <= 77) return { emoji: "🌨️", text: "下雪" };
-            if (code <= 82) return { emoji: "🌧️", text: "陣雨" };
-            if (code <= 86) return { emoji: "🌨️", text: "陣雪" };
-            if (code <= 99) return { emoji: "⛈️", text: "雷雨" };
-            return { emoji: "☁️", text: "未知" };
-        }
- 
-        // ==================== 台灣地址格式化 ====================
-        // 組合順序:郵遞區號 縣市 區 路名巷弄號
-        // 過濾:國家(臺灣)、里、鄰、區塊、村、neighbourhood
-        function formatTWAddress(data) {
-            if (!data) return "未知地點";
-            const a = data.address || {};
- 
-            // 郵遞區號
-            const postcode = a.postcode || "";
- 
-            // 縣市(Nominatim 會把直轄市放在 city,其他縣放在 county)
-            const cityLevel = a.city || a.county || a.state || "";
- 
-            // 區/鄉/鎮(排除「里」「村」之類的更細層)
-            const districtLevel = a.city_district || a.district || a.town || a.township || a.suburb || "";
- 
-            // 路名
-            const road = a.road || "";
- 
-            // 巷弄號(Nominatim 分別在 neighbourhood 可能含巷弄,但更可靠的是 house_number)
-            const houseNumber = a.house_number || "";
- 
-            // 組合
-            const parts = [postcode, cityLevel, districtLevel, road + houseNumber].filter(p => p && p.trim());
-            let result = parts.join(" ").trim();
- 
-            // fallback:如果結構化欄位取不到足夠資訊,改從 display_name 清理
-            if (!result || parts.length < 2) {
-                const raw = (data.display_name || "").split(",").map(s => s.trim());
-                // 移除含「臺灣/台灣」「里」「鄰」「區塊」的片段
-                const filtered = raw.filter(p =>
-                    p &&
-                    !/臺灣|台灣|Taiwan/i.test(p) &&
-                    !/里$/.test(p) &&
-                    !/鄰$/.test(p) &&
-                    !/村$/.test(p)
-                );
-                result = filtered.reverse().join(" ").trim();
-            }
- 
-            return result || "未知地點";
-        }
- 
-        // ==================== 相機 ====================
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-            .then(stream => {
-                video.srcObject = stream;
-                videoTrack = stream.getVideoTracks()[0];
-                if (videoTrack.getCapabilities) {
-                    const caps = videoTrack.getCapabilities();
-                    if (caps.zoom) {
-                        hardwareZoomSupported = true;
-                        zoomSlider.min = caps.zoom.min;
-                        zoomSlider.max = Math.min(caps.zoom.max, 6);
-                        zoomSlider.step = caps.zoom.step || 0.1;
-                        zoomSlider.value = caps.zoom.min;
-                        currentZoom = caps.zoom.min;
-                        zoomLabel.innerText = currentZoom.toFixed(1) + "x";
-                    }
-                }
-            })
-            .catch(() => { statusDiv.innerText = "❌ 無法取得相機,請使用 Chrome"; });
- 
-        zoomSlider.addEventListener('input', () => {
-            currentZoom = parseFloat(zoomSlider.value);
-            zoomLabel.innerText = currentZoom.toFixed(1) + "x";
-            if (hardwareZoomSupported && videoTrack) {
-                videoTrack.applyConstraints({ advanced: [{ zoom: currentZoom }] }).catch(() => {});
-                video.style.transform = 'none';
-            } else {
-                video.style.transform = `scale(${currentZoom})`;
-                video.style.transformOrigin = 'center center';
-            }
-        });
- 
-        function getBase64Size(base64String) {
-            const len = base64String.length - 'data:image/jpeg;base64,'.length;
-            const bytes = 4 * Math.ceil(len / 3) * 0.5624896334383812;
-            return (bytes / 1024).toFixed(0) + " KB";
-        }
- 
-        // ==================== SHA-256 防偽雜湊 ====================
-        async function computeHash(dataUrl) {
-            try {
-                const base64 = dataUrl.split(',')[1];
-                const binStr = atob(base64);
-                const bytes = new Uint8Array(binStr.length);
-                for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
-                const hashBuffer = await crypto.subtle.digest('SHA-256', bytes);
-                const hashArr = Array.from(new Uint8Array(hashBuffer));
-                return hashArr.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 8).toUpperCase();
-            } catch (e) {
-                return "XXXXXXXX";
-            }
-        }
- 
-        // ==================== 小地圖(OSM 靜態瓦片) ====================
-        async function drawMiniMap(ctx, x, y, size, lat, lon) {
-            if (lat === null || lon === null) return;
-            try {
-                const zoom = 16;  // 建築輪廓級,最清晰
-                const n = Math.pow(2, zoom);
- 
-                // 計算精確的瓦片座標(浮點數,小數部分代表在瓦片內的相對位置)
-                const xTileExact = (lon + 180) / 360 * n;
-                const yTileExact = (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1/Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n;
- 
-                // 中心瓦片(整數)
-                const xTileCenter = Math.floor(xTileExact);
-                const yTileCenter = Math.floor(yTileExact);
- 
-                // 使用者在中心瓦片內的相對位置 (0~1)
-                const xFrac = xTileExact - xTileCenter;
-                const yFrac = yTileExact - yTileCenter;
- 
-                // 抓 3×3 瓦片拼成大圖,確保使用者位置周圍都有地圖內容
-                // 拼接後共 768×768 px(3 × 256)
-                const TILE = 256;
-                const GRID = 3;  // 3×3
-                const fullSize = TILE * GRID;
- 
-                // 建立離屏 canvas 拼貼瓦片
-                const offCanvas = document.createElement('canvas');
-                offCanvas.width = fullSize;
-                offCanvas.height = fullSize;
-                const offCtx = offCanvas.getContext('2d');
- 
-                // 並行抓取 9 張瓦片
-                const tilePromises = [];
-                for (let dy = -1; dy <= 1; dy++) {
-                    for (let dx = -1; dx <= 1; dx++) {
-                        const tx = xTileCenter + dx;
-                        const ty = yTileCenter + dy;
-                        // 邊界檢查
-                        if (tx < 0 || ty < 0 || tx >= n || ty >= n) continue;
-                        const url = `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`;
-                        tilePromises.push(loadTile(url, dx, dy, offCtx, TILE));
-                    }
-                }
-                await Promise.all(tilePromises);
- 
-                // 計算使用者在拼貼大圖中的精確像素位置(以中心瓦片為基準)
-                // 中心瓦片在拼貼圖中的左上角是 (TILE, TILE)
-                const userPxInFull = {
-                    x: TILE + xFrac * TILE,  // 中心瓦片起點 + 在瓦片內的偏移
-                    y: TILE + yFrac * TILE
-                };
- 
-                // 從拼貼大圖裁切出「以使用者為中心」的視窗
-                // 視窗尺寸 = 與目標 size 相符的「來源像素數」(使用 1.5 倍比例可保留銳利度)
-                const sourceWindow = TILE * 1.5;  // 384 來源像素 → 縮成 size,保留高解析
-                const srcX = userPxInFull.x - sourceWindow / 2;
-                const srcY = userPxInFull.y - sourceWindow / 2;
- 
-                // 繪製白色背景框
-                ctx.fillStyle = "rgba(255,255,255,0.95)";
-                ctx.fillRect(x - 3, y - 3, size + 6, size + 6);
- 
-                // 將拼貼後且使用者置中的區塊畫到主 canvas
-                ctx.drawImage(
-                    offCanvas,
-                    srcX, srcY, sourceWindow, sourceWindow,  // 來源
-                    x, y, size, size                          // 目標
-                );
- 
-                // 紅點正中央(因為已經把使用者位置置中)
-                const dotX = x + size / 2;
-                const dotY = y + size / 2;
-                const dotR = size * 0.06;
- 
-                // 紅點外白圈
-                ctx.beginPath();
-                ctx.arc(dotX, dotY, dotR + 2, 0, Math.PI * 2);
-                ctx.fillStyle = "white";
-                ctx.fill();
- 
-                // 紅點本體
-                ctx.beginPath();
-                ctx.arc(dotX, dotY, dotR, 0, Math.PI * 2);
-                ctx.fillStyle = "#e74c3c";
-                ctx.fill();
- 
-                // 中間白點(高亮)
-                ctx.beginPath();
-                ctx.arc(dotX, dotY, dotR * 0.35, 0, Math.PI * 2);
-                ctx.fillStyle = "white";
-                ctx.fill();
- 
-            } catch (e) {
-                console.warn("小地圖載入失敗:", e);
-            }
-        }
- 
-        // 載入單張瓦片並繪製到指定位置
-        function loadTile(url, dx, dy, offCtx, tileSize) {
-            return new Promise((resolve) => {
-                const img = new Image();
-                img.crossOrigin = "anonymous";
-                const drawX = (dx + 1) * tileSize;  // dx=-1 → 0, dx=0 → tile, dx=1 → 2*tile
-                const drawY = (dy + 1) * tileSize;
-                img.onload = () => {
-                    offCtx.drawImage(img, drawX, drawY, tileSize, tileSize);
-                    resolve();
-                };
-                img.onerror = () => resolve();  // 單張失敗不影響整體
-                img.src = url;
-                setTimeout(resolve, 4000);  // 超時保險
-            });
-        }
- 
-        // ==================== 主題色轉 RGB(給底盒用) ====================
-        function hexToRgba(hex, alpha) {
-            const r = parseInt(hex.slice(1, 3), 16);
-            const g = parseInt(hex.slice(3, 5), 16);
-            const b = parseInt(hex.slice(5, 7), 16);
-            return `rgba(${r},${g},${b},${alpha})`;
-        }
- 
-        // ==================== 核心拍照 ====================
-        async function processPhoto(startOrEnd) {
-            if (!video.videoWidth) {
-                showToast("相機尚未就緒");
+        setStatus("正在請求定位權限並計算位置…", "loading");
+        navigator.geolocation.getCurrentPosition(success, error, options);
+    }
+
+    // ── 持續追蹤切換 ─────────────────────────────────
+    function toggleWatch() {
+        const on = document.getElementById("watchToggle").checked;
+        if (on) {
+            if (!navigator.geolocation) {
+                setStatus("您的瀏覽器不支援定位功能。", "err");
+                document.getElementById("watchToggle").checked = false;
                 return;
             }
- 
-            const ctx = canvas.getContext('2d');
-            const MAX_WIDTH = 2560;
-            const vw = video.videoWidth;
-            const vh = video.videoHeight;
-            let targetWidth = vw, targetHeight = vh;
-            if (targetWidth > MAX_WIDTH) {
-                targetHeight = Math.round(targetHeight * (MAX_WIDTH / targetWidth));
-                targetWidth = MAX_WIDTH;
+            setStatus("持續追蹤中…移動時會自動更新", "loading");
+            watchId = navigator.geolocation.watchPosition(success, error, options);
+        } else {
+            if (watchId !== null) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
             }
-            canvas.width = targetWidth;
-            canvas.height = targetHeight;
- 
-            // 繪製相機畫面(含變焦裁切)
-            if (!hardwareZoomSupported && currentZoom > 1) {
-                const cropW = vw / currentZoom, cropH = vh / currentZoom;
-                const cropX = (vw - cropW) / 2, cropY = (vh - cropH) / 2;
-                ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, targetWidth, targetHeight);
-            } else {
-                ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
-            }
- 
-            const now = new Date();
-            const dateStr = now.toLocaleDateString('zh-TW', { year:'numeric', month:'2-digit', day:'2-digit' }).replace(/\//g, '-');
-            const timeStr = now.toLocaleTimeString('zh-TW', { hour12: false });
- 
-            const base = canvas.width * 0.03;
-            const noteText = noteInput.value.trim();
-            const hasNote = noteText.length > 0;
- 
-            // 小地圖尺寸
-            const mapSize = base * 8;
-            const mapPadding = base * 0.6;
- 
-            // 底盒高度(加進備註、天氣、雜湊各一行)
-            const gradHeight = hasNote ? base * 13 : base * 10;
-            const gradY = canvas.height - gradHeight;
- 
-            // 繪製主題色邊條(左側)
-            ctx.fillStyle = currentThemeColor;
-            ctx.fillRect(0, gradY, base * 0.4, gradHeight);
- 
-            // 繪製半透明底盒
-            ctx.fillStyle = "rgba(0,0,0,0.65)";
-            ctx.fillRect(base * 0.4, gradY, canvas.width - base * 0.4, gradHeight);
- 
-            // 繪製小地圖(右下角)
-            const mapX = canvas.width - mapSize - mapPadding;
-            const mapY = gradY + (gradHeight - mapSize) / 2;
-            await drawMiniMap(ctx, mapX, mapY, mapSize, currentLat, currentLon);
- 
-            // 文字區域右邊界
-            const textRightBound = mapX - base * 0.5;
- 
-            let cursorY = gradY + (base * 2.5);
-            const textLeft = base * 1.2;
- 
-            // 備註大字
-            if (hasNote) {
-                ctx.fillStyle = "#FFD700";
-                ctx.font = `bold ${base * 2.0}px sans-serif`;
-                const noteDisplay = noteText.length > 14 ? noteText.substring(0, 14) + "..." : noteText;
-                ctx.fillText(`📝 ${noteDisplay}`, textLeft, cursorY);
-                cursorY += base * 2.3;
-            }
- 
-            // 工作類型 + 狀態(開始/結束 或 出發/抵達)
-            ctx.font = `bold ${base * 1.5}px sans-serif`;
-            ctx.fillStyle = currentThemeColor;
-            const statusLabel = (startOrEnd === "開始" || startOrEnd === "出發") ? "🚀" : "🏁";
-            ctx.fillText(`${currentTypeLabel} ${statusLabel} ${startOrEnd}`, textLeft, cursorY);
-            cursorY += base * 2.2;
- 
-            // 日期時間
-            ctx.fillStyle = "white";
-            ctx.font = `bold ${base * 2.2}px sans-serif`;
-            ctx.fillText(`${dateStr} ${timeStr}`, textLeft, cursorY);
-            cursorY += base * 1.4;
- 
-            // 地址(需限制寬度,避免蓋到地圖)
-            ctx.font = `${base * 1.0}px sans-serif`;
-            const maxAddrWidth = textRightBound - textLeft;
-            let addrToDisplay = currentAddress;
-            while (ctx.measureText(`📍 ${addrToDisplay}`).width > maxAddrWidth && addrToDisplay.length > 5) {
-                addrToDisplay = addrToDisplay.substring(0, addrToDisplay.length - 2);
-            }
-            if (addrToDisplay !== currentAddress) addrToDisplay += "...";
-            ctx.fillText(`📍 ${addrToDisplay}`, textLeft, cursorY);
-            cursorY += base * 1.1;
- 
-            // 天氣
-            if (weatherText) {
-                ctx.fillStyle = "rgba(255,255,255,0.85)";
-                ctx.font = `${base * 0.95}px sans-serif`;
-                ctx.fillText(weatherText, textLeft, cursorY);
-                cursorY += base * 1.0;
-            }
- 
-            // GPS + 變焦
-            ctx.fillStyle = "rgba(255,255,255,0.6)";
-            ctx.font = `${base * 0.75}px monospace`;
-            const zoomInfo = currentZoom > 1.05 ? ` | ${currentZoom.toFixed(1)}x` : '';
-            ctx.fillText(latLon + zoomInfo, textLeft, cursorY);
-            cursorY += base * 0.9;
- 
-            // 先輸出一次(不含雜湊)以計算雜湊
-            const preliminaryUrl = canvas.toDataURL('image/jpeg', 0.95);
-            const hash = await computeHash(preliminaryUrl);
- 
-            // 繪製雜湊
-            ctx.fillStyle = "rgba(255,255,255,0.45)";
-            ctx.font = `${base * 0.7}px monospace`;
-            ctx.fillText(`🔐 ${hash}`, textLeft, cursorY);
- 
-            // 最終輸出
-            const imgUrl = canvas.toDataURL('image/jpeg', 0.95);
-            photo.src = imgUrl;
-            downloadBtn.href = imgUrl;
- 
-            const safeNote = hasNote ? "_" + noteText.replace(/[\\/:*?"<>|\s]/g, '').substring(0, 10) : "";
-            const fileName = `Job_${currentTypeLabel}_${startOrEnd}${safeNote}_${dateStr}_${timeStr.replace(/:/g,'')}.jpg`;
-            downloadBtn.download = fileName;
- 
-            fileInfoDiv.innerText = `${targetWidth}×${targetHeight} | ${getBase64Size(imgUrl)} | 🔐${hash}`;
- 
-            // 轉 Blob 用於分享
-            try {
-                const blob = await (await fetch(imgUrl)).blob();
-                lastPhotoBlob = new File([blob], fileName, { type: 'image/jpeg' });
-            } catch (e) {
-                lastPhotoBlob = null;
-            }
- 
-            // 寫入紀錄(localStorage)
-            saveRecord({
-                timestamp: now.toISOString(),
-                date: dateStr,
-                time: timeStr,
-                type: currentWorkType,
-                typeLabel: currentTypeLabel,
-                action: startOrEnd,
-                note: noteText,
-                address: currentAddress,
-                lat: currentLat,
-                lon: currentLon,
-                weather: weatherText,
-                zoom: currentZoom,
-                hash: hash,
-                fileName: fileName
-            });
- 
-            previewModal.classList.add('active');
+            setStatus("已停止持續追蹤。", "done");
         }
- 
-        // ==================== 紀錄儲存(永久) ====================
-        function saveRecord(record) {
-            try {
-                const key = 'workcam_records';
-                const existing = JSON.parse(localStorage.getItem(key) || '[]');
-                existing.push(record);
-                localStorage.setItem(key, JSON.stringify(existing));
-                showToast(`✅ 紀錄已儲存 (共 ${existing.length} 筆)`);
-            } catch (e) {
-                showToast("⚠️ 紀錄儲存失敗");
-            }
+    }
+
+    // ── 成功取得定位 ─────────────────────────────────
+    function success(position) {
+        const c = position.coords;
+        lastCoords = { lat: c.latitude, lng: c.longitude };
+
+        document.getElementById("lat").textContent = c.latitude.toFixed(6);
+        document.getElementById("lng").textContent = c.longitude.toFixed(6);
+
+        // 準確率上色：越小越好
+        const accEl = document.getElementById("acc");
+        const a = c.accuracy;
+        accEl.textContent = "方圓 " + a.toFixed(1) + " 公尺內";
+        accEl.className = "v " + (a <= 20 ? "accuracy-good" : a <= 100 ? "accuracy-mid" : "accuracy-bad");
+
+        document.getElementById("alt").textContent =
+            (c.altitude != null && !isNaN(c.altitude)) ? c.altitude.toFixed(1) + " 公尺" : "無資料";
+        document.getElementById("spd").textContent =
+            (c.speed != null && !isNaN(c.speed)) ? (c.speed * 3.6).toFixed(1) + " km/h" : "無資料";
+        document.getElementById("time").textContent =
+            new Date(position.timestamp).toLocaleTimeString("zh-TW");
+
+        document.getElementById("mapLink").href =
+            `https://www.google.com/maps?q=${c.latitude},${c.longitude}`;
+
+        document.getElementById("card").classList.add("show");
+
+        const watching = document.getElementById("watchToggle").checked;
+        setStatus(watching ? "持續追蹤中…座標已更新" : "定位成功！",
+                  watching ? "loading" : "done");
+    }
+
+    // ── 定位失敗 ─────────────────────────────────────
+    function error(err) {
+        let msg;
+        switch (err.code) {
+            case err.PERMISSION_DENIED:
+                msg = "使用者拒絕了定位請求。請到 iPhone「設定 → Safari → 位置」與網站權限中開啟。";
+                break;
+            case err.POSITION_UNAVAILABLE:
+                msg = "無法取得位置資訊（可能 GPS 訊號太弱，建議移到戶外或窗邊）。";
+                break;
+            case err.TIMEOUT:
+                msg = "定位要求逾時，請再試一次。";
+                break;
+            default:
+                msg = "發生未知錯誤：" + err.message;
         }
- 
-        // ==================== 分享 ====================
-        shareBtn.addEventListener('click', async () => {
-            if (!lastPhotoBlob) {
-                showToast("照片尚未就緒");
-                return;
-            }
- 
-            // 先自動觸發儲存(模擬點擊下載連結)
-            try {
-                downloadBtn.click();
-                showToast("💾 照片已儲存至 Download");
-            } catch (e) {
-                console.warn("自動儲存失敗:", e);
-            }
- 
-            const shareText = `【${currentTypeLabel} - ${document.querySelector('.type-btn.active').dataset.label}】\n📍 ${currentAddress}\n🕐 ${new Date().toLocaleString('zh-TW')}${noteInput.value.trim() ? '\n📝 ' + noteInput.value.trim() : ''}`;
- 
-            if (navigator.share && navigator.canShare && navigator.canShare({ files: [lastPhotoBlob] })) {
-                try {
-                    await navigator.share({
-                        files: [lastPhotoBlob],
-                        title: '工作紀錄',
-                        text: shareText
-                    });
-                } catch (e) {
-                    if (e.name !== 'AbortError') showToast("分享取消或失敗");
-                }
-            } else {
-                // Fallback:複製文字
-                try {
-                    await navigator.clipboard.writeText(shareText);
-                    showToast("📋 已儲存並複製文字");
-                } catch (e) {
-                    showToast("已儲存,此瀏覽器不支援直接分享");
-                }
-            }
-        });
- 
-        // ==================== 按鈕綁定 ====================
-        document.getElementById('snap-start').addEventListener('click', () => {
-            const action = (currentWorkType === 'transit') ? "出發" : "開始";
-            processPhoto(action);
-        });
-        document.getElementById('snap-end').addEventListener('click', () => {
-            const action = (currentWorkType === 'transit') ? "抵達" : "結束";
-            processPhoto(action);
-        });
-        document.getElementById('close-preview').addEventListener('click', () => {
-            previewModal.classList.remove('active');
-            noteInput.value = '';  // 拍完清空備註
-        });
+        setStatus(msg, "err");
+    }
+
+    // ── 複製座標 ─────────────────────────────────────
+    function copyCoords() {
+        if (!lastCoords) return;
+        const txt = `${lastCoords.lat.toFixed(6)}, ${lastCoords.lng.toFixed(6)}`;
+        const btn = document.getElementById("copyBtn");
+        const done = () => { btn.textContent = "已複製 ✓"; setTimeout(() => btn.textContent = "複製座標", 1500); };
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(txt).then(done).catch(fallbackCopy);
+        } else {
+            fallbackCopy();
+        }
+        function fallbackCopy() {
+            const t = document.createElement("textarea");
+            t.value = txt; t.style.position = "fixed"; t.style.opacity = "0";
+            document.body.appendChild(t); t.focus(); t.select();
+            try { document.execCommand("copy"); done(); } catch (e) {}
+            document.body.removeChild(t);
+        }
+    }
+
+    // ── 狀態列 helper ────────────────────────────────
+    function setStatus(text, type) {
+        const el = document.getElementById("status");
+        el.className = "status" + (type === "err" ? " err" : type === "done" ? " done" : "");
+        el.innerHTML = (type === "loading" ? '<span class="spinner"></span>' : "") +
+                       `<span>${text}</span>`;
+    }
     </script>
 </body>
 </html>
