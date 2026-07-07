@@ -386,9 +386,19 @@
  
         // ==================== 環境檢測 ====================
         const ua = navigator.userAgent || navigator.vendor || window.opera;
+        // iPhone / iPad 偵測(含 iPadOS 偽裝成 Mac 的情況)
+        const isIOS = /iPad|iPhone|iPod/.test(ua) ||
+                      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const recommendedBrowser = isIOS ? 'Safari' : 'Chrome';
+
         const isAppBrowser = (ua.indexOf("Line") > -1) || (ua.indexOf("FBAN") > -1) ||
                              (ua.indexOf("FBAV") > -1) || (ua.indexOf("Instagram") > -1);
-        if (isAppBrowser) { guide.style.display = 'flex'; }
+        if (isAppBrowser) {
+            // 依平台顯示正確的建議瀏覽器(iPhone → Safari,Android → Chrome)
+            const guideTitle = guide.querySelector('h2');
+            if (guideTitle) guideTitle.innerText = `請使用 ${recommendedBrowser} 開啟`;
+            guide.style.display = 'flex';
+        }
  
         // ==================== 工作類型切換 ====================
         // 啟動時從 HTML 上 active 的按鈕讀取預設值,避免 HTML/JS 不同步
@@ -427,41 +437,107 @@
         });
  
         // ==================== GPS + 天氣 ====================
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(async (pos) => {
-                currentLat = pos.coords.latitude;
-                currentLon = pos.coords.longitude;
-                latLon = `GPS: ${currentLat.toFixed(5)}, ${currentLon.toFixed(5)}`;
- 
-                // 地址解析(使用 addressdetails 結構化欄位,精確過濾不要的層級)
-                try {
-                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&addressdetails=1&lat=${currentLat}&lon=${currentLon}&accept-language=zh-TW`);
-                    const data = await res.json();
-                    currentAddress = formatTWAddress(data);
-                    statusDiv.innerText = `📍 ${currentAddress}`;
-                } catch (e) {
-                    currentAddress = "地址解析暫時不可用";
-                    statusDiv.innerText = "📍 " + latLon;
-                }
- 
-                // 天氣(使用 open-meteo,免 API Key)
-                try {
-                    const wRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${currentLat}&longitude=${currentLon}&current=temperature_2m,weather_code,wind_speed_10m&timezone=auto`);
-                    const wData = await wRes.json();
-                    const temp = wData.current.temperature_2m;
-                    const wCode = wData.current.weather_code;
-                    const wInfo = weatherCodeToText(wCode);
-                    weatherText = `${wInfo.emoji} ${wInfo.text} ${temp}°C`;
-                    weatherDiv.innerText = weatherText;
-                } catch (e) {
-                    weatherDiv.innerText = "☁️ 天氣資訊暫不可用";
-                    weatherText = "";
-                }
-            }, () => {
-                statusDiv.innerText = "❌ 請允許 GPS 定位權限";
-                weatherDiv.innerText = "";
-            }, { enableHighAccuracy: true });
+        // 定位參數(對 iPhone / Android GPS 都重要)
+        const geoOptions = {
+            enableHighAccuracy: true, // 強制使用 GPS 精準定位,而非基地台模糊定位
+            timeout: 15000,           // 逾時 15 秒(手機首次抓 GPS 可能較久)
+            maximumAge: 0             // 每次都抓最新位置,不使用快取
+        };
+
+        // 反向地理編碼 + 天氣(首次定位與重新定位共用)
+        async function resolveLocation(lat, lon) {
+            currentLat = lat;
+            currentLon = lon;
+            latLon = `GPS: ${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+
+            // 地址解析(使用 addressdetails 結構化欄位,精確過濾不要的層級)
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&addressdetails=1&lat=${lat}&lon=${lon}&accept-language=zh-TW`);
+                const data = await res.json();
+                currentAddress = formatTWAddress(data);
+                statusDiv.innerText = `📍 ${currentAddress}  🔄`;
+            } catch (e) {
+                currentAddress = "地址解析暫時不可用";
+                statusDiv.innerText = "📍 " + latLon + "  🔄";
+            }
+            // 定位成功後,狀態列可點擊 → 重新定位(換地點時更新地址/天氣)
+            statusDiv.style.cursor = "pointer";
+            statusDiv.onclick = requestLocation;
+
+            // 天氣(使用 open-meteo,免 API Key)
+            try {
+                const wRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m&timezone=auto`);
+                const wData = await wRes.json();
+                const temp = wData.current.temperature_2m;
+                const wCode = wData.current.weather_code;
+                const wInfo = weatherCodeToText(wCode);
+                weatherText = `${wInfo.emoji} ${wInfo.text} ${temp}°C`;
+                weatherDiv.innerText = weatherText;
+            } catch (e) {
+                weatherDiv.innerText = "☁️ 天氣資訊暫不可用";
+                weatherText = "";
+            }
         }
+
+        // 定位失敗處理(依錯誤碼給不同提示;高精準度逾時會自動退回網路定位重試一次)
+        function onGeoError(err, isRetry) {
+            // 高精準度逾時 → 改用網路定位再試(iPhone / Android 皆適用)
+            if (err.code === err.TIMEOUT && !isRetry) {
+                statusDiv.innerText = "⏳ GPS 較慢,改用網路定位重試...";
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => resolveLocation(pos.coords.latitude, pos.coords.longitude),
+                    (e2) => onGeoError(e2, true),
+                    { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+                );
+                return;
+            }
+
+            let msg;
+            switch (err.code) {
+                case err.PERMISSION_DENIED:
+                    msg = isIOS
+                        ? "❌ 定位被拒。請到「設定→隱私權與安全性→定位服務→Safari網站」開啟,再點此重試"
+                        : "❌ 定位被拒。請允許此網站的位置權限後,點此重試";
+                    break;
+                case err.POSITION_UNAVAILABLE:
+                    msg = "❌ 收不到定位訊號,請移到戶外或窗邊,點此重試";
+                    break;
+                case err.TIMEOUT:
+                    msg = "❌ 定位逾時,點此重試";
+                    break;
+                default:
+                    msg = "❌ 定位失敗:" + err.message + ",點此重試";
+            }
+            statusDiv.innerText = msg;
+            weatherDiv.innerText = "";
+            statusDiv.style.cursor = "pointer";
+            statusDiv.onclick = requestLocation;  // 點狀態列即可重試
+        }
+
+        // 發起一次定位請求
+        function requestLocation() {
+            if (!navigator.geolocation) {
+                statusDiv.innerText = "❌ 此瀏覽器不支援定位功能";
+                return;
+            }
+            // iPhone / Android 都只在 HTTPS(或 localhost)允許定位
+            if (!window.isSecureContext) {
+                statusDiv.innerText = "⚠️ 非 HTTPS 環境,手機會拒絕定位。請用 https:// 網址開啟";
+                weatherDiv.innerText = "";
+                return;
+            }
+            statusDiv.innerText = "🛰️ 定位中...";
+            statusDiv.style.cursor = "default";
+            statusDiv.onclick = null;
+            navigator.geolocation.getCurrentPosition(
+                (pos) => resolveLocation(pos.coords.latitude, pos.coords.longitude),
+                (err) => onGeoError(err, false),
+                geoOptions
+            );
+        }
+
+        // 啟動時自動定位一次
+        requestLocation();
  
         function weatherCodeToText(code) {
             // WMO 天氣代碼對應
@@ -521,24 +597,37 @@
         }
  
         // ==================== 相機 ====================
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-            .then(stream => {
-                video.srcObject = stream;
-                videoTrack = stream.getVideoTracks()[0];
-                if (videoTrack.getCapabilities) {
-                    const caps = videoTrack.getCapabilities();
-                    if (caps.zoom) {
-                        hardwareZoomSupported = true;
-                        zoomSlider.min = caps.zoom.min;
-                        zoomSlider.max = Math.min(caps.zoom.max, 6);
-                        zoomSlider.step = caps.zoom.step || 0.1;
-                        zoomSlider.value = caps.zoom.min;
-                        currentZoom = caps.zoom.min;
-                        zoomLabel.innerText = currentZoom.toFixed(1) + "x";
+        // 非 HTTPS 環境下 navigator.mediaDevices 會是 undefined,先擋掉避免整段程式崩潰
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            statusDiv.innerText = window.isSecureContext
+                ? "❌ 此瀏覽器不支援相機"
+                : "❌ 非 HTTPS 環境無法開啟相機,請改用 https:// 網址開啟";
+        } else {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+                .then(stream => {
+                    video.srcObject = stream;
+                    videoTrack = stream.getVideoTracks()[0];
+                    if (videoTrack.getCapabilities) {
+                        const caps = videoTrack.getCapabilities();
+                        if (caps.zoom) {
+                            hardwareZoomSupported = true;
+                            zoomSlider.min = caps.zoom.min;
+                            zoomSlider.max = Math.min(caps.zoom.max, 6);
+                            zoomSlider.step = caps.zoom.step || 0.1;
+                            zoomSlider.value = caps.zoom.min;
+                            currentZoom = caps.zoom.min;
+                            zoomLabel.innerText = currentZoom.toFixed(1) + "x";
+                        }
                     }
-                }
-            })
-            .catch(() => { statusDiv.innerText = "❌ 無法取得相機,請使用 Chrome"; });
+                })
+                .catch((e) => {
+                    // NotAllowedError = 使用者拒絕;其餘多半是瀏覽器不支援
+                    const tip = (e && e.name === 'NotAllowedError')
+                        ? "請允許相機權限"
+                        : "請改用 " + recommendedBrowser + " 開啟";
+                    statusDiv.innerText = "❌ 無法取得相機," + tip;
+                });
+        }
  
         zoomSlider.addEventListener('input', () => {
             currentZoom = parseFloat(zoomSlider.value);
